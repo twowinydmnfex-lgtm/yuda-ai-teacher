@@ -43,7 +43,7 @@ body{font-family:'Noto Sans TC',system-ui,-apple-system,sans-serif;background:#F
 .msg-av{width:30px;height:30px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #B5D4F4;flex-shrink:0;margin-top:2px}
 .bub{padding:10px 15px;border-radius:12px;font-size:14px;line-height:1.7;background:#F7F9FC;border:0.5px solid #E2E8F0;color:#1E293B;max-width:72%}
 .msg.user .bub{background:#E6F1FB;color:#0C447C;border-color:#B5D4F4}
-/* 解題卡片：左右雙欄 */
+/* 解題卡片：左右雙欄（桌機）/ 上下排列（手機） */
 .msg.result-msg{width:100%;align-items:flex-start}
 .result-wrap{
   display:grid;
@@ -75,7 +75,20 @@ body{font-family:'Noto Sans TC',system-ui,-apple-system,sans-serif;background:#F
 .ex-av{width:24px;height:24px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #B5D4F4;flex-shrink:0}
 .ex-name{font-size:14px;font-weight:700;color:#1E293B}
 .ex-hint{font-size:12px;color:#64748B;margin-left:auto}
+/* 桌機：限高可捲動；手機：直接展開不限高 */
 .explain-body{flex:1;overflow-y:auto;max-height:380px}
+@media(max-width:600px){
+  .result-wrap{
+    grid-template-columns:1fr;
+    grid-template-rows:auto auto auto;
+  }
+  .q-bar{grid-column:1;grid-row:1}
+  .result-card{grid-column:1;grid-row:2;border-right:none;border-bottom:0.5px solid #E2E8F0}
+  .explain-card{grid-column:1;grid-row:3}
+  .explain-body{overflow-y:visible;max-height:none;height:auto}
+  .erow{padding:12px 12px}
+  .ed{font-size:13px;line-height:1.8}
+}
 .explain-body::-webkit-scrollbar{width:3px}
 .explain-body::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:2px}
 .erow{padding:11px 14px;border-left:4px solid transparent;display:flex;gap:10px}
