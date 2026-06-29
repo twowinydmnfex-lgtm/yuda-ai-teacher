@@ -1,0 +1,1764 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>育達 AI 老師</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&display=swap');
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Noto Sans TC',system-ui,-apple-system,sans-serif;background:#F7F9FC;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+
+/* ── 登入畫面 ── */
+#loginScreen{position:fixed;inset:0;background:#F7F9FC;display:flex;align-items:center;justify-content:center;z-index:100}
+.login-box{background:#fff;border:0.5px solid #E2E8F0;border-radius:20px;padding:36px 32px;width:340px;box-shadow:0 4px 24px rgba(0,0,0,0.08);display:flex;flex-direction:column;align-items:center;gap:18px}
+.login-logo{width:56px;height:56px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;color:#185FA5;font-size:22px;font-weight:700;border:2px solid #B5D4F4}
+.login-title{font-size:18px;font-weight:700;color:#1E293B}
+.login-sub{font-size:12px;color:#64748B;text-align:center;line-height:1.6}
+.login-inp{width:100%;padding:11px 14px;border-radius:10px;border:0.5px solid #E2E8F0;font-size:14px;font-family:inherit;color:#1E293B;letter-spacing:2px;text-align:center;transition:border-color .15s}
+.login-inp:focus{outline:none;border-color:#378ADD}
+.login-btn{width:100%;padding:12px;border-radius:10px;border:none;background:#185FA5;color:#fff;font-size:14px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s}
+.login-btn:hover{background:#0C447C}
+.login-btn:disabled{opacity:.5;cursor:default}
+.login-err{font-size:12px;color:#E24B4A;text-align:center;min-height:18px}
+
+/* ── 主畫面 ── */
+#mainScreen{display:none;flex:1;flex-direction:column;overflow:hidden}
+#mainScreen.show{display:flex}
+.topbar{background:#0D1B2A;padding:6px 16px;display:flex;align-items:center;justify-content:space-between;flex-shrink:0}
+.topbar-name{font-size:11px;color:#6B9EC2}
+.topbar-name span{color:#B5D4F4;font-weight:700}
+.logout-btn{font-size:11px;color:#374B5E;background:transparent;border:0.5px solid #374B5E;border-radius:5px;padding:3px 10px;cursor:pointer;font-family:inherit}
+.logout-btn:hover{color:#6B9EC2;border-color:#6B9EC2}
+.app{flex:1;display:flex;flex-direction:column;max-width:1200px;width:100%;margin:0 auto;padding:12px 24px 0;overflow:hidden}
+.shell{flex:1;display:flex;flex-direction:column;border:0.5px solid #E2E8F0;border-radius:16px;overflow:hidden;background:#fff;box-shadow:0 2px 12px rgba(0,0,0,0.06)}
+.hdr{display:flex;align-items:center;gap:10px;padding:12px 18px;border-bottom:0.5px solid #E2E8F0;background:#F7F9FC;flex-shrink:0}
+.av{width:38px;height:38px;border-radius:50%;background:#E6F1FB;display:flex;align-items:center;justify-content:center;color:#185FA5;font-size:14px;font-weight:700;border:1px solid #B5D4F4;flex-shrink:0}
+.hdr-name{font-size:15px;font-weight:700;color:#1E293B}
+.chat{flex:1;overflow-y:auto;padding:16px 22px;display:flex;flex-direction:column;gap:14px;background:#fff}
+.chat::-webkit-scrollbar{width:4px}
+.chat::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:2px}
+.msg{display:flex;gap:8px;align-items:flex-start}
+.msg.user{flex-direction:row-reverse}
+.msg-av{width:30px;height:30px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #B5D4F4;flex-shrink:0;margin-top:2px}
+.bub{padding:10px 15px;border-radius:12px;font-size:14px;line-height:1.7;background:#F7F9FC;border:0.5px solid #E2E8F0;color:#1E293B;max-width:72%}
+.msg.user .bub{background:#E6F1FB;color:#0C447C;border-color:#B5D4F4}
+/* 解題卡片：左右雙欄 */
+.msg.result-msg{width:100%;align-items:flex-start}
+.result-wrap{
+  display:grid;
+  grid-template-columns:1fr 1fr;
+  grid-template-rows:auto 1fr;
+  gap:0;
+  flex:1;
+  min-width:0;
+  width:100%;
+  border-radius:12px;
+  overflow:hidden;
+  border:0.5px solid #E2E8F0;
+  box-shadow:0 2px 10px rgba(0,0,0,0.07);
+}
+.q-bar{background:#0D1B2A;padding:9px 14px;display:flex;align-items:flex-start;gap:8px;grid-column:1/-1;grid-row:1}
+.q-num{background:#185FA5;color:#B5D4F4;font-size:11px;padding:2px 9px;border-radius:99px;white-space:nowrap;flex-shrink:0;margin-top:1px}
+.q-txt{font-size:13px;color:#cdd9e8;line-height:1.5;word-break:break-all}
+.result-card{background:#fff;border:none;border-right:0.5px solid #E2E8F0;overflow:hidden;display:flex;flex-direction:column}
+.explain-card{background:#fff;border:none;overflow:hidden;display:flex;flex-direction:column}
+.res-ctrl{display:flex;align-items:center;justify-content:space-between;padding:8px 14px;border-top:0.5px solid #E2E8F0;background:#F7F9FC;flex-shrink:0}
+.res-ctrl button{padding:5px 14px;border-radius:7px;border:none;background:#C9A4E8;color:#1F0C00;font-size:12px;cursor:pointer;font-family:inherit;transition:all .15s}
+.res-ctrl button:hover{background:#b98fd4}
+.res-ctrl button:disabled{opacity:.3;cursor:default}
+.res-ctrl button.pr{background:#C9A4E8;color:#1F0C00;border:none}
+.ctrl-dots{display:flex;gap:5px;align-items:center}
+.dot{width:7px;height:7px;border-radius:50%;background:#E2E8F0;border:none;padding:0;cursor:pointer;transition:background .2s}
+.dot.on{background:#378ADD}
+.explain-hdr{padding:10px 16px;border-bottom:0.5px solid #E5EAF0;display:flex;align-items:center;gap:7px;background:#F7F9FC;flex-shrink:0}
+.ex-av{width:24px;height:24px;border-radius:50%;background:#E6F1FB;color:#185FA5;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:center;border:1px solid #B5D4F4;flex-shrink:0}
+.ex-name{font-size:14px;font-weight:700;color:#1E293B}
+.ex-hint{font-size:12px;color:#64748B;margin-left:auto}
+.explain-body{flex:1;overflow-y:auto;max-height:380px}
+.explain-body::-webkit-scrollbar{width:3px}
+.explain-body::-webkit-scrollbar-thumb{background:#E2E8F0;border-radius:2px}
+.erow{padding:11px 14px;border-left:4px solid transparent;display:flex;gap:10px}
+.erow:not(:last-child){border-bottom:0.5px solid #E5EAF0}
+.erow.bl{border-left-color:#B5D4F4}.erow.am{border-left-color:#F5D89A}.erow.gr{border-left-color:#9FE1CB}
+.erow:hover{background:#F4F6F9}
+.erow-icon{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;transition:all .18s}
+.erow.bl .erow-icon{background:#E6F1FB;color:#185FA5;border:1px solid #B5D4F4}
+.erow.am .erow-icon{background:#FAEEDA;color:#633806;border:1px solid #F5D89A}
+.erow.gr .erow-icon{background:#E1F5EE;color:#085041;border:1px solid #9FE1CB}
+
+.erow-content{flex:1;min-width:0}
+.et{font-size:14px;font-weight:700;color:#0F172A;margin-bottom:4px}
+.ed{font-size:13px;color:#1E3A5F;line-height:1.7}
+.step-tag{display:inline-block;font-size:10px;padding:1px 8px;border-radius:99px;margin-left:6px;vertical-align:middle;font-weight:500}
+.erow.bl .step-tag{background:#E6F1FB;color:#185FA5;border:0.5px solid #B5D4F4}
+.erow.am .step-tag{background:#FAEEDA;color:#633806;border:0.5px solid #F5D89A}
+.erow.gr .step-tag{background:#E1F5EE;color:#085041;border:0.5px solid #9FE1CB}
+.erow-fallback{padding:18px 16px;display:flex;flex-direction:column;align-items:center;gap:12px;text-align:center}
+.erow-fallback-txt{font-size:13px;color:#64748B;line-height:1.7}
+.erow-retry-btn{padding:8px 18px;border-radius:9px;border:0.5px solid #B5D4F4;background:#E6F1FB;color:#185FA5;font-size:13px;font-weight:700;cursor:pointer;font-family:inherit;transition:all .15s}
+.erow-retry-btn:hover{background:#185FA5;color:#fff}
+.typing-bub{display:flex;gap:4px;align-items:center;padding:2px 0}
+.td{width:5px;height:5px;border-radius:50%;background:#64748B;animation:blink 1.2s infinite}
+.td:nth-child(2){animation-delay:.2s}.td:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:.2}40%{opacity:1}}
+.img-preview-row{display:none;align-items:center;gap:8px;padding:6px 9px;background:#fff;border-radius:8px;border:0.5px solid #E2E8F0}
+.img-thumb{width:44px;height:44px;border-radius:6px;object-fit:cover;border:0.5px solid #E2E8F0;flex-shrink:0}
+.img-name{font-size:11px;color:#64748B;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.img-rm{width:20px;height:20px;border-radius:50%;border:0.5px solid #E2E8F0;background:transparent;color:#64748B;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:11px;flex-shrink:0}
+.inp-zone{padding:10px 14px 14px;border-top:0.5px solid #E2E8F0;background:#F7F9FC;flex-shrink:0;display:flex;flex-direction:column;gap:7px;border-radius:0 0 16px 16px}
+.inp-row{display:flex;gap:8px;align-items:flex-end}
+.inp-row textarea{flex:1;resize:none;padding:9px 12px;border-radius:9px;border:0.5px solid #E2E8F0;font-size:13px;font-family:inherit;background:#fff;color:#1E293B;line-height:1.5;height:40px;max-height:110px;overflow-y:hidden;transition:border-color .15s}
+.inp-row textarea:focus{outline:none;border-color:#378ADD}
+.cam-btn{width:38px;height:38px;border-radius:9px;border:0.5px solid #E2E8F0;background:#fff;color:#64748B;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px;transition:all .15s}
+.cam-btn:hover{background:#E6F1FB;color:#185FA5;border-color:#B5D4F4}
+.send-btn{width:38px;height:38px;border-radius:9px;border:none;background:#185FA5;color:#fff;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:17px;transition:all .15s}
+.send-btn:hover{background:#0C447C}
+.send-btn:disabled{opacity:.35;cursor:default}
+.hint{font-size:11px;color:#94A3B8;text-align:center}
+#fileInput{display:none}
+</style>
+</head>
+<body>
+
+<!-- 登入畫面 -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">AI</div>
+    <div class="login-title">育達 AI 老師</div>
+    <div class="login-sub">請輸入你的身分證號碼<br>進行身分驗證後即可開始使用</div>
+    <input class="login-inp" type="text" id="loginId" placeholder="請輸入身分證號碼" maxlength="10" autocomplete="off" spellcheck="false">
+    <div class="login-err" id="loginErr"></div>
+    <button class="login-btn" id="loginBtn" onclick="doLogin()">進入 AI 老師</button>
+  </div>
+</div>
+
+<!-- 主畫面 -->
+<div id="mainScreen">
+  <div class="topbar">
+    <div class="topbar-name">已登入：<span id="displayId"></span></div>
+    <button class="logout-btn" onclick="doLogout()">登出</button>
+  </div>
+  <div class="app">
+    <div class="shell">
+      <div class="hdr">
+        <div class="av">AI</div>
+        <div class="hdr-name">育達 AI 老師</div>
+      </div>
+      <div class="chat" id="chat">
+        <div class="msg">
+          <div class="msg-av">AI</div>
+          <div class="bub">你好！有題目不會嗎？<br>直接把題目貼進來，或拍照上傳，我會一步一步解釋，還會畫圖給你看。</div>
+        </div>
+      </div>
+      <div class="inp-zone">
+        <div class="img-preview-row" id="previewRow">
+          <img class="img-thumb" id="imgThumb" src="" alt="題目圖片">
+          <span class="img-name" id="imgName">圖片.jpg</span>
+          <button class="img-rm" onclick="clearImg()">✕</button>
+        </div>
+        <div class="inp-row">
+          <button class="cam-btn" onclick="document.getElementById('fileInput').click()" title="上傳圖片">📷</button>
+          <input type="file" id="fileInput" accept="image/*" onchange="handleImg(event)">
+          <textarea id="inp" placeholder="輸入題目，或點相機上傳圖片…" oninput="autoH(this)" onkeydown="onKey(event)"></textarea>
+          <button class="send-btn" id="sendBtn" onclick="send()">➤</button>
+        </div>
+        <div class="hint">支援文字輸入 · 圖片上傳 · 拍照辨識</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+const WORKERS_URL='https://ydai-proxy.twowinydmnfex.workers.dev';
+
+let studentId='';
+
+// ── 登入 ──────────────────────────────────────────────
+document.getElementById('loginId').addEventListener('keydown',function(e){
+  if(e.key==='Enter') doLogin();
+});
+
+async function doLogin(){
+  const id=document.getElementById('loginId').value.trim().toUpperCase();
+  if(!id){document.getElementById('loginErr').textContent='請輸入身分證號碼';return;}
+  const btn=document.getElementById('loginBtn');
+  btn.disabled=true; btn.textContent='驗證中…';
+  document.getElementById('loginErr').textContent='';
+  try{
+    const res=await fetch(WORKERS_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({studentId:id, action:'login'})
+    });
+    const data=await res.json();
+    if(res.status===403||data.error){
+      document.getElementById('loginErr').textContent=data.error||'驗證失敗，請確認身分證號碼';
+      btn.disabled=false; btn.textContent='進入 AI 老師';
+    } else if(data.ok){
+      studentId=id;
+      document.getElementById('loginScreen').style.display='none';
+      document.getElementById('mainScreen').classList.add('show');
+      document.getElementById('displayId').textContent=id;
+      document.getElementById('inp').focus();
+    } else {
+      document.getElementById('loginErr').textContent='驗證失敗，請確認後再試';
+      btn.disabled=false; btn.textContent='進入 AI 老師';
+    }
+  }catch(err){
+    document.getElementById('loginErr').textContent='網路錯誤，請稍後再試';
+    btn.disabled=false; btn.textContent='進入 AI 老師';
+  }
+}
+
+function doLogout(){
+  studentId='';
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('mainScreen').classList.remove('show');
+  document.getElementById('loginId').value='';
+  document.getElementById('loginErr').textContent='';
+  document.getElementById('loginBtn').disabled=false;
+  document.getElementById('loginBtn').textContent='進入 AI 老師';
+  // 清空聊天記錄
+  const chat=document.getElementById('chat');
+  chat.innerHTML='<div class="msg"><div class="msg-av">AI</div><div class="bub">你好！有題目不會嗎？<br>直接把題目貼進來，或拍照上傳，我會一步一步解釋，還會畫圖給你看。</div></div>';
+}
+
+// ── Image upload ──────────────────────────────────────
+let pendingImg=null;
+function handleImg(e){
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=ev=>{
+    pendingImg=ev.target.result.split(',')[1];
+    document.getElementById('imgThumb').src=ev.target.result;
+    document.getElementById('imgName').textContent=file.name;
+    document.getElementById('previewRow').style.display='flex';
+  };
+  reader.readAsDataURL(file);e.target.value='';
+}
+function clearImg(){pendingImg=null;document.getElementById('previewRow').style.display='none';document.getElementById('imgThumb').src='';}
+function autoH(ta){ta.style.height='40px';ta.style.height=Math.min(ta.scrollHeight,110)+'px';}
+function onKey(e){if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();send();}}
+
+// ── Chat helpers ──────────────────────────────────────
+function escapeHtml(str){
+  if(str===undefined||str===null)return '';
+  return String(str)
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;')
+    .replace(/'/g,'&#39;')
+    .replace(/\n/g,'<br>');
+}
+function addMsg(role,html){
+  const chat=document.getElementById('chat');
+  const safe=escapeHtml(html);
+  const d=document.createElement('div');d.className='msg'+(role==='user'?' user':'');
+  if(role==='user')d.innerHTML='<div class="bub">'+safe+'</div>';
+  else d.innerHTML='<div class="msg-av">AI</div><div class="bub">'+safe+'</div>';
+  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+}
+function showTyping(){
+  const chat=document.getElementById('chat');
+  const d=document.createElement('div');d.className='msg';d.id='typing';
+  d.innerHTML='<div class="msg-av">AI</div><div class="bub"><div class="typing-bub"><div class="td"></div><div class="td"></div><div class="td"></div></div></div>';
+  chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+}
+function removeTyping(){const t=document.getElementById('typing');if(t)t.remove();}
+
+// ── Phase engine ──────────────────────────────────────
+const cardPhases={},cardAnimIds={},cardPhasesList={};
+function ease(t){return t<.5?2*t*t:-1+(4-2*t)*t;}
+function animCard(id){
+  if(cardAnimIds[id])cancelAnimationFrame(cardAnimIds[id]);
+  let t=0;
+  function frame(){
+    t=Math.min(t+1/45,1);
+    const fns=cardPhasesList[id];const p=cardPhases[id]||0;
+    if(fns&&fns[p]){const cv=document.getElementById('cv_'+id);if(cv){const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);fns[p](ctx,cv.width,cv.height,ease(t));}}
+    syncUI(id);if(t<1)cardAnimIds[id]=requestAnimationFrame(frame);
+  }
+  requestAnimationFrame(frame);
+}
+function cardPrev(id){const p=cardPhases[id]||0;if(p>0){cardPhases[id]=p-1;animCard(id);}}
+function cardNext(id){const n=(cardPhasesList[id]||[]).length,p=cardPhases[id]||0;if(p<n-1){cardPhases[id]=p+1;animCard(id);}}
+function jumpTo(id,p){cardPhases[id]=p;animCard(id);}
+function updateExplainHighlight(id,p){}
+function syncUI(id){
+  const n=(cardPhasesList[id]||[]).length,p=cardPhases[id]||0;
+  const bp=document.getElementById('bp_'+id);if(bp)bp.disabled=p===0;
+  const bn=document.getElementById('bn_'+id);if(bn)bn.disabled=p===n-1;
+  const dotsEl=document.getElementById('dots_'+id);
+  if(dotsEl)dotsEl.querySelectorAll('.dot').forEach((d,i)=>{d.className='dot'+(i===p?' on':'');});
+  updateExplainHighlight(id,p);
+}
+
+// ── Draw helpers ──────────────────────────────────────
+function LX(ctx,W,H,text,x,y,col,size,bold){
+  size=size||12;
+  ctx.font=(bold?'600':'400')+' '+size+'px \'Noto Sans TC\',system-ui,sans-serif';
+  const tw=ctx.measureText(text).width,pad=6,th=size+pad*2;
+  // 邊界保護：確保標籤完整顯示在畫布內
+  const bw=tw+pad*2;
+  let sx=x,sy=y;
+  if(sx-bw/2<4) sx=bw/2+4;
+  if(sx+bw/2>W-4) sx=W-bw/2-4;
+  if(sy-th/2<4) sy=th/2+4;
+  if(sy+th/2>H-4) sy=H-th/2-4;
+  // 半透明背景
+  ctx.fillStyle='rgba(255,255,255,0.55)';
+  ctx.beginPath();ctx.roundRect(sx-bw/2,sy-th/2,bw,th,4);ctx.fill();
+  ctx.fillStyle=col;ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText(text,sx,sy);
+}
+function arrowX(ctx,x1,y1,x2,y2,col,lw){
+  ctx.strokeStyle=col;ctx.lineWidth=lw||2;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  const a=Math.atan2(y2-y1,x2-x1);ctx.fillStyle=col;ctx.beginPath();
+  ctx.moveTo(x2,y2);ctx.lineTo(x2-9*Math.cos(a-.3),y2-9*Math.sin(a-.3));ctx.lineTo(x2-9*Math.cos(a+.3),y2-9*Math.sin(a+.3));ctx.closePath();ctx.fill();
+}
+function tBox(ctx,W,H,lines,cx,cy,cols,size){
+  size=size||11;const lh=size*1.55,totalH=lines.length*lh+10;
+  let maxW=0;lines.forEach(l=>{ctx.font='500 '+size+'px \'Noto Sans TC\',system-ui,sans-serif';maxW=Math.max(maxW,ctx.measureText(l).width);});
+  const bw=maxW+18,bx=Math.max(4,Math.min(W-bw-4,cx-bw/2)),by=Math.max(4,Math.min(H-totalH-4,cy-totalH/2));
+  ctx.fillStyle='rgba(255,255,255,0.88)';ctx.strokeStyle=cols[0]||'#378ADD';ctx.lineWidth=0.8;
+  ctx.beginPath();ctx.roundRect(bx,by,bw,totalH,5);ctx.fill();ctx.stroke();
+  lines.forEach((l,i)=>{ctx.fillStyle=cols[i]||cols[0];ctx.font='500 '+size+'px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(l,bx+bw/2,by+8+i*lh+lh/2);});
+}
+function ansBox(ctx,W,H,text){
+  if(!text)return;
+  ctx.font='500 13px \'Noto Sans TC\',system-ui,sans-serif';
+  const tw=ctx.measureText(text).width;
+  const bw=Math.min(tw+24, W-16), bh=32;
+  const bx=W-bw-8, by=H-bh-8;
+  ctx.fillStyle='rgba(225,245,238,0.95)';ctx.strokeStyle='rgba(15,110,86,0.35)';ctx.lineWidth=0.8;
+  ctx.beginPath();ctx.roundRect(bx,by,bw,bh,5);ctx.fill();ctx.stroke();
+  ctx.fillStyle='#0F6E56';ctx.textAlign='center';ctx.textBaseline='middle';
+  // 長文字縮小字體
+  if(tw>bw-16){ctx.font='400 11px \'Noto Sans TC\',system-ui,sans-serif';}
+  ctx.fillText(text,bx+bw/2,by+bh/2);
+}
+function lerp(a,b,t){return a+(b-a)*t;}
+
+// ── Build phase functions ─────────────────────────────
+function buildPhaseFns(obj){
+  // ── 預判防呆層：標準化所有輸入 ──────────────────────
+  // 1. graphType 別名對應（AI 有時回傳不標準的名稱）
+  const typeAlias={
+    'triangle_angle':'triangle','余弦':'triangle','正弦':'triangle','三角形':'triangle',
+    'quadratic_function':'quadratic','二次函數':'quadratic','parabola':'quadratic',
+    'pythagorean_theorem':'pythagorean','畢氏定理':'pythagorean',
+    'sinusoidal':'sincos','sine':'sincos','cosine':'sincos','trig':'sincos',
+    'velocity_time':'vt','v_t':'vt','kinematics':'vt',
+    'spring_system':'spring','彈簧系統':'spring',
+    'gear_system':'gear','齒輪系統':'gear',
+    'pulley_system':'pulley','皮帶輪系統':'pulley',
+    'circle_equation':'circle','圓方程式':'circle','圓形':'circle',
+    'circular':'circular_motion','centripetal':'circular_motion','彎道':'circular_motion',
+    'vector_addition':'vector','向量合成':'vector','向量':'vector',
+    'linear_function':'linear','一次函數':'linear',
+    'lp':'linear_programming','linear_prog':'linear_programming',
+    'dc':'dc_circuit','circuit':'dc_circuit','直流電路':'dc_circuit',
+    'power_triangle':'power','功率三角形':'power',
+    'friction':'friction_disc','摩擦盤':'friction_disc',
+  };
+  let gtype=(obj.graphType||'text').trim();
+  gtype=typeAlias[gtype]||gtype;
+
+  // 2. graphParams 空值補預設（避免 NaN/undefined 炸圖）
+  const gp=obj.graphParams||{};
+  const phases=(obj.phases||[]).filter(p=>p&&(p.title||p.formula));
+  const ans=obj.answer||'';
+  const PN=Math.max(phases.length,1);
+
+  // 3. phases 長度不足時補空白步驟（防止 phases.map 跑到 undefined）
+  while(phases.length<1) phases.push({title:'解題過程',formula:''});
+
+  const blue='#0C447C',red='#A32D2D',green='#085041',amber='#854F0B',purple='#3C3489';
+  const faded='rgba(180,178,169,0.5)',fg='#1E293B',fgm='#64748B';
+
+  if(gtype==='triangle'||gtype==='triangle_angle'){
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+
+      // ── 三角形頂點：縮小至上方 70% 區域，下方留給條件框 ──
+      const pad=28, triH=H*0.68;
+      const B={x:pad+8,       y:triH};
+      const C={x:W-pad-8,     y:triH};
+      const A={x:Math.round(W*0.30), y:pad+10};
+
+      // 輔助：線段中點
+      const mid=(p,q,t=0.5)=>({x:lerp(p.x,q.x,t),y:lerp(p.y,q.y,t)});
+
+      // ── 底層三角形（所有步驟都顯示）──
+      const triAlpha=pi===0?1:0.22;
+      ctx.strokeStyle=`rgba(12,68,124,${triAlpha})`;ctx.lineWidth=pi===0?2.2:1.2;
+      ctx.fillStyle=`rgba(55,138,221,${pi===0?0.07:0.03})`;
+      ctx.beginPath();ctx.moveTo(B.x,B.y);ctx.lineTo(C.x,C.y);ctx.lineTo(A.x,A.y);ctx.closePath();
+      ctx.fill();ctx.stroke();
+
+      // 頂點字母（所有步驟）
+      const vtxSize=13;
+      LX(ctx,W,H,'B',B.x-16,B.y+13,fg,vtxSize,true);
+      LX(ctx,W,H,'C',C.x+16,C.y+13,fg,vtxSize,true);
+      LX(ctx,W,H,'A',A.x,   A.y-16,fg,vtxSize,true);
+
+      // ── 邊長標籤（pi>=0 就顯示）──
+      const edgeLabelCol=pi===0?blue:fgm;
+      const edgeSz=11;
+      if(gp.AB){
+        const m=mid(B,A);
+        LX(ctx,W,H,'AB='+gp.AB, m.x-28, m.y, edgeLabelCol, edgeSz);
+      }
+      if(gp.AC){
+        const m=mid(A,C);
+        LX(ctx,W,H,'AC='+gp.AC, m.x+22, m.y, edgeLabelCol, edgeSz);
+      }
+      if(gp.BC){
+        const m=mid(B,C);
+        LX(ctx,W,H,'BC='+gp.BC, m.x, m.y+16, edgeLabelCol, edgeSz);
+      }
+
+      // ── 角度弧線輔助 ──
+      function drawAngleArc(vx,vy,p1x,p1y,p2x,p2y,col,label,offX,offY,animE){
+        const a1=Math.atan2(p1y-vy,p1x-vx);
+        const a2=Math.atan2(p2y-vy,p2x-vx);
+        ctx.strokeStyle=col;ctx.lineWidth=1.6;
+        ctx.beginPath();ctx.arc(vx,vy,26,a1,a1+(a2-a1)*(animE||1));ctx.stroke();
+        if((animE||1)>0.4)LX(ctx,W,H,label,vx+offX,vy+offY,col,11,true);
+      }
+
+      // ── 步驟對應圖形 ──
+      if(pi===0){
+        // step 0：只顯示已知邊長（已在上方處理）+ 已知角在角頂點畫弧
+        if(gp.angleA){
+          drawAngleArc(A.x,A.y, B.x,B.y, C.x,C.y, blue,'∠A='+gp.angleA, -10,22, e);
+        }
+        if(gp.angleB){
+          drawAngleArc(B.x,B.y, A.x,A.y, C.x,C.y, blue,'∠B='+gp.angleB, 30,8, e);
+        }
+        if(gp.angleC){
+          drawAngleArc(C.x,C.y, A.x,A.y, B.x,B.y, blue,'∠C='+gp.angleC, -54,8, e);
+        }
+      }
+      if(pi===1){
+        // step 1：標出要求的角（通常是∠ACB 或∠BAC）
+        const a1r=Math.atan2(A.y-B.y,A.x-B.x),a2r=Math.atan2(C.y-B.y,C.x-B.x);
+        ctx.strokeStyle=red;ctx.lineWidth=1.8;
+        ctx.beginPath();ctx.arc(B.x,B.y,30,a1r,a1r+(a2r-a1r)*e);ctx.stroke();
+        if(e>0.3)LX(ctx,W,H,'∠B',B.x+36,B.y-14,red,11,true);
+        if(gp.cosA&&e>0.5)LX(ctx,W,H,'cosC='+gp.cosA,B.x+70,B.y-14,red,11);
+        if(gp.angleA&&e>0.3){
+          drawAngleArc(A.x,A.y, B.x,B.y, C.x,C.y, blue,'∠A='+gp.angleA, -10,22, 1);
+        }
+        if(gp.angleC&&e>0.3){
+          drawAngleArc(C.x,C.y, A.x,A.y, B.x,B.y, amber,'∠C='+gp.angleC, -54,8, 1);
+        }
+      }
+      if(pi===2){
+        // step 2：強調求解邊（BC）
+        ctx.strokeStyle=green;ctx.lineWidth=3;
+        ctx.beginPath();ctx.moveTo(B.x,B.y);ctx.lineTo(lerp(B.x,C.x,e),lerp(B.y,C.y,e));ctx.stroke();
+        if(gp.BC)LX(ctx,W,H,'BC='+gp.BC,(B.x+C.x)/2,(B.y+C.y)/2+16,green,12,true);
+        if(phases[2]&&phases[2].formula)tBox(ctx,W,H,[phases[2].formula],W*0.72,H*0.25,[green],11);
+        // 保留角度
+        if(gp.angleA)drawAngleArc(A.x,A.y,B.x,B.y,C.x,C.y,blue,'∠A='+gp.angleA,-10,22,1);
+        if(gp.angleC)drawAngleArc(C.x,C.y,A.x,A.y,B.x,B.y,amber,'∠C='+gp.angleC,-54,8,1);
+      }
+      if(pi>=3){
+        // step 3：標出所有角 + 答案
+        if(gp.angleA)drawAngleArc(A.x,A.y,B.x,B.y,C.x,C.y,blue,'∠A='+gp.angleA,-10,22,1);
+        if(gp.angleB)drawAngleArc(B.x,B.y,A.x,A.y,C.x,C.y,red,'∠B='+gp.angleB,30,8,1);
+        if(gp.angleC)drawAngleArc(C.x,C.y,A.x,A.y,B.x,B.y,purple,'∠C='+gp.angleC,-54,8,e);
+        if(e>0.6)ansBox(ctx,W,H,ans);
+      }
+
+      // ── 下方條件框（所有步驟）──
+      const knownLines=[];
+      if(gp.AB)knownLines.push('AB = '+gp.AB);
+      if(gp.AC)knownLines.push('AC = '+gp.AC);
+      if(gp.BC&&pi<2)knownLines.push('BC = '+gp.BC);
+      if(gp.angleA)knownLines.push('∠A = '+gp.angleA);
+      if(gp.angleB)knownLines.push('∠B = '+gp.angleB);
+      if(gp.angleC)knownLines.push('∠C = '+gp.angleC);
+      if(knownLines.length>0){
+        const s=10,lh=s*1.6,px=10,py=6;
+        const cols=2, rows=Math.ceil(knownLines.length/cols);
+        const colW=(W-px*4)/cols;
+        const bh=rows*lh+py*2, by=H-bh-6, bx=px;
+        ctx.fillStyle='rgba(255,255,255,0.90)';
+        ctx.strokeStyle='rgba(180,210,240,0.8)';ctx.lineWidth=0.7;
+        ctx.beginPath();ctx.roundRect(bx,by,W-px*2,bh,6);ctx.fill();ctx.stroke();
+        knownLines.forEach((l,i)=>{
+          const col=i%cols, row=Math.floor(i/cols);
+          const tx=bx+px+col*colW, ty=by+py+row*lh+lh/2;
+          ctx.fillStyle='#1E3A5F';
+          ctx.font='500 '+s+'px \'Noto Sans TC\',system-ui,sans-serif';
+          ctx.textAlign='left';ctx.textBaseline='middle';
+          ctx.fillText(l, tx, ty);
+        });
+      }
+    });
+  }
+  if(gtype==='quadratic'){
+    const a=gp.a||1,b=gp.b||0,c=gp.c||0;
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const cx=W/2,cy=H/2,sx=W/10,sy=H/7;
+      ctx.strokeStyle='rgba(55,138,221,0.12)';ctx.lineWidth=0.5;
+      for(let x=0;x<=W;x+=W/8){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+      for(let y=0;y<=H;y+=H/6){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+      ctx.strokeStyle='rgba(55,138,221,0.45)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(10,cy);ctx.lineTo(W-10,cy);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx,10);ctx.lineTo(cx,H-10);ctx.stroke();
+      ctx.strokeStyle=blue;ctx.lineWidth=2.2;ctx.beginPath();let first=true;
+      for(let px=0;px<W*(pi===0?e:1);px++){const xv=(px-cx)/sx,yv=a*xv*xv+b*xv+c,py=cy-yv*sy;if(py>-10&&py<H+10){first?ctx.moveTo(px,py):ctx.lineTo(px,py);first=false;}}
+      ctx.stroke();LX(ctx,W,H,'y='+a+'x²'+(b===0?'':(b>0?'+'+b:b))+(c===0?'':(c>0?'+'+c:c)),20,14,blue,10);
+      if(pi>=1){const vx=-b/(2*a),vy=a*vx*vx+b*vx+c,vpx=cx+vx*sx,vpy=cy-vy*sy;ctx.fillStyle=red;ctx.beginPath();ctx.arc(vpx,vpy,5,0,Math.PI*2);ctx.fill();LX(ctx,W,H,'頂點('+vx.toFixed(1)+','+vy.toFixed(1)+')',vpx+56,vpy-10,red,12,true);if(phases[1]&&phases[1].formula)tBox(ctx,W,H,[phases[1].formula],W*0.8,H*0.16,[red],11);}
+      if(pi>=2){const disc=b*b-4*a*c;if(disc>=0){[(-b+Math.sqrt(disc))/(2*a),(-b-Math.sqrt(disc))/(2*a)].forEach(r=>{ctx.fillStyle=green;ctx.beginPath();ctx.arc(cx+r*sx,cy,5,0,Math.PI*2);ctx.fill();LX(ctx,W,H,'x='+r.toFixed(1),cx+r*sx,cy+16,green,12,true);});if(phases[2]&&phases[2].formula)tBox(ctx,W,H,[phases[2].formula],W*0.8,H*0.76,[green],11);}}
+      if(pi===PN-1&&e>0.5)ansBox(ctx,W,H,ans);
+    });
+  }
+  if(gtype==='pythagorean'){
+    const a=gp.a||3,b2=gp.b||4,c=gp.c||5;
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const sc=Math.min((W-80)/b2,(H-80)/a),ox=38,oy=H-38;
+      if(pi>=1){ctx.strokeStyle=pi===1?blue:fgm;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox+b2*sc*(pi===1?e:1),oy);ctx.stroke();LX(ctx,W,H,'C',ox-14,oy+12,fg,12,true);LX(ctx,W,H,'B',ox+b2*sc+14,oy+12,fg,12,true);LX(ctx,W,H,'b='+b2,ox+b2*sc/2,oy+16,pi===1?blue:fgm,11);}
+      if(pi>=2){ctx.strokeStyle=pi===2?red:fgm;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(ox+b2*sc,oy);ctx.lineTo(ox+b2*sc,oy-a*sc*(pi===2?e:1));ctx.stroke();LX(ctx,W,H,'A',ox+b2*sc+14,oy-a*sc-10,fg,12,true);LX(ctx,W,H,'a='+a,ox+b2*sc+16,oy-a*sc/2,pi===2?red:fgm,11);const sq=10;ctx.strokeStyle=fgm;ctx.lineWidth=1;ctx.strokeRect(ox+b2*sc-sq,oy-sq,sq,sq);}
+      if(pi>=3){ctx.strokeStyle=purple;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(lerp(ox,ox+b2*sc,e),lerp(oy,oy-a*sc,e));ctx.stroke();LX(ctx,W,H,'c='+c,ox+b2*sc/2-16,oy-a*sc/2-14,purple,11,true);tBox(ctx,W,H,['a²+b²=c²',a+'²+'+b2+'²='+c+'²','='+c*c],W*0.18,H*0.26,[purple,purple,green],11);if(e>0.7)ansBox(ctx,W,H,ans);}
+    });
+  }
+  if(gtype==='rlc'){
+    const R=gp.R||12,XL=gp.XL||20,XC=gp.XC||5,X=XL-XC,sc=gp.scale||8;
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const ox=70,oy=H/2;
+      ctx.strokeStyle='rgba(55,138,221,0.2)';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(20,oy);ctx.lineTo(W-16,oy);ctx.stroke();ctx.beginPath();ctx.moveTo(ox,14);ctx.lineTo(ox,H-14);ctx.stroke();
+      LX(ctx,W,H,'R軸',W-22,oy-10,fgm,11);LX(ctx,W,H,'+j',ox+12,18,fgm,11);LX(ctx,W,H,'−j',ox+12,H-18,fgm,11);
+      if(pi===0){arrowX(ctx,ox,oy,ox+R*sc*e,oy,blue,2.5);LX(ctx,W,H,'R='+R+'Ω',ox+R*sc/2,oy+14,blue,11);arrowX(ctx,ox,oy,ox,oy-XL*sc*e,red,2);LX(ctx,W,H,'XL='+XL+'Ω',ox+30,oy-XL*sc/2,red,11);arrowX(ctx,ox,oy,ox,oy+XC*sc*e,amber,2);LX(ctx,W,H,'XC='+XC+'Ω',ox+28,oy+XC*sc/2+6,amber,11);}
+      if(pi>=1){const dim=pi>=3;arrowX(ctx,ox,oy,ox+R*sc,oy,dim?faded:blue,dim?1.2:2);LX(ctx,W,H,'R='+R,ox+R*sc/2,oy+12,dim?fgm:blue,11);arrowX(ctx,ox,oy,ox,oy-XL*sc,dim?faded:red,dim?1.2:1.8);LX(ctx,W,H,'XL='+XL,ox+28,oy-XL*sc/2,dim?fgm:red,11);arrowX(ctx,ox,oy,ox,oy+XC*sc,dim?faded:amber,dim?1.2:1.8);LX(ctx,W,H,'XC='+XC,ox+26,oy+XC*sc/2+6,dim?fgm:amber,11);}
+      if(pi===1){arrowX(ctx,ox,oy,ox,oy-X*sc*e,green,2.8);LX(ctx,W,H,'X='+X+'Ω',ox+30,oy-X*sc/2,green,11,true);tBox(ctx,W,H,['X=XL-XC='+XL+'-'+XC+'='+X+'Ω'],W*0.72,H*0.2,[green],11);}
+      if(pi>=2)arrowX(ctx,ox,oy,ox,oy-X*sc,pi>=3?faded:green,pi>=3?1.2:1.8);
+      if(pi===2){const zx=ox+R*sc,zy=oy-X*sc;ctx.setLineDash([4,3]);ctx.strokeStyle=faded;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(zx,oy);ctx.lineTo(lerp(zx,zx,e),lerp(oy,zy,e));ctx.stroke();ctx.beginPath();ctx.moveTo(ox,zy);ctx.lineTo(lerp(ox,zx,e),zy);ctx.stroke();ctx.setLineDash([]);arrowX(ctx,ox,oy,lerp(ox,zx,e),lerp(oy,zy,e),purple,2.8);const Z2=Math.sqrt(R*R+X*X);LX(ctx,W,H,'Z=?',lerp(ox,zx,.5)+16,lerp(oy,zy,.5)-12,purple,10);tBox(ctx,W,H,['Z=√(R²+X²)','=√('+R+'²+'+X+'²)','≈'+Z2.toFixed(1)+'Ω'],W*0.8,H*0.2,[purple,purple,purple],10);}
+      if(pi>=3){const zx=ox+R*sc,zy=oy-X*sc;ctx.setLineDash([3,3]);ctx.strokeStyle=faded;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(zx,oy);ctx.lineTo(zx,zy);ctx.stroke();ctx.beginPath();ctx.moveTo(ox,zy);ctx.lineTo(zx,zy);ctx.stroke();ctx.setLineDash([]);arrowX(ctx,ox,oy,zx,zy,purple,2.5);const Z2=Math.sqrt(R*R+X*X),theta=Math.atan2(X,R)*180/Math.PI,angRad=Math.atan2(-(zy-oy),zx-ox);LX(ctx,W,H,'Z≈'+Z2.toFixed(1)+'Ω',(ox+zx)/2+16,(oy+zy)/2-12,purple,11,true);ctx.strokeStyle=amber;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(ox,oy,28,0,-angRad,false);ctx.stroke();LX(ctx,W,H,'θ≈'+theta.toFixed(1)+'°',ox+46,oy-16,amber,10);tBox(ctx,W,H,['cosθ≈'+Math.cos(angRad).toFixed(3)],W*0.8,H*0.78,[green],11);ansBox(ctx,W,H,ans);}
+    });
+  }
+  if(gtype==='sincos'){
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const cx=W/2,cy=H/2,sx=W/8,sy=H/3.5;
+      ctx.strokeStyle='rgba(55,138,221,0.12)';ctx.lineWidth=0.5;for(let y=0;y<=H;y+=H/5){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+      ctx.strokeStyle='rgba(55,138,221,0.45)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(10,cy);ctx.lineTo(W-10,cy);ctx.stroke();ctx.beginPath();ctx.moveTo(cx,10);ctx.lineTo(cx,H-10);ctx.stroke();
+      ctx.strokeStyle=blue;ctx.lineWidth=2;ctx.beginPath();let f=true;for(let px=0;px<W*(pi===0?e:1);px++){const xv=(px-cx)/sx,py=cy-Math.sin(xv)*sy;f?ctx.moveTo(px,py):ctx.lineTo(px,py);f=false;}ctx.stroke();LX(ctx,W,H,'sin(x)',cx+72,cy-sy-9,blue,12,true);
+      if(pi>=1){ctx.strokeStyle=red;ctx.lineWidth=2;ctx.beginPath();let f2=true;for(let px=0;px<W*(pi===1?e:1);px++){const xv=(px-cx)/sx,py=cy-Math.cos(xv)*sy;f2?ctx.moveTo(px,py):ctx.lineTo(px,py);f2=false;}ctx.stroke();LX(ctx,W,H,'cos(x)',cx+72,cy-sy+12,red,12,true);}
+      if(pi>=2){ctx.strokeStyle=fgm;ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(cx+Math.PI/2*sx,0);ctx.lineTo(cx+Math.PI/2*sx,H);ctx.stroke();ctx.setLineDash([]);LX(ctx,W,H,'π/2',cx+Math.PI/2*sx,18,fgm,11);tBox(ctx,W,H,['cos=sin相位超前π/2'],W*0.26,H*0.82,[green],11);}
+      if(pi===PN-1&&e>0.5)ansBox(ctx,W,H,ans);
+    });
+  }
+
+  // ── v-t 圖（等加速運動）──
+  if(gtype==='vt'){
+    const v0=gp.v0||0,a=gp.a||3,t=gp.t||4;
+    const vf=v0+a*t,dx=v0*t+0.5*a*t*t;
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const ox=64,oy=H-52,tw=W-90,th=H-80;
+      const scx=tw/Math.max(t*1.3,5),scy=th/Math.max(vf*1.3,10);
+      // 格線
+      ctx.strokeStyle='rgba(55,138,221,0.1)';ctx.lineWidth=0.5;
+      for(let i=0;i<=t+1;i++){ctx.beginPath();ctx.moveTo(ox+i*scx,oy-th);ctx.lineTo(ox+i*scx,oy+4);ctx.stroke();}
+      for(let i=0;i<=Math.ceil(vf*1.3);i+=Math.max(1,Math.ceil(vf/5))){ctx.beginPath();ctx.moveTo(ox-4,oy-i*scy);ctx.lineTo(ox+tw,oy-i*scy);ctx.stroke();}
+      // 軸
+      arrowX(ctx,ox,oy,ox+tw+12,oy,'#64748B',1.5);
+      arrowX(ctx,ox,oy,ox,oy-th-12,'#64748B',1.5);
+      LX(ctx,W,H,'t (s)',ox+tw+20,oy,'#64748B',11);
+      LX(ctx,W,H,'v (m/s)',ox,oy-th-20,'#64748B',11);
+      LX(ctx,W,H,'O',ox-14,oy+12,'#64748B',11);
+      // t 軸刻度
+      for(let i=1;i<=t;i++){ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ox+i*scx,oy-4);ctx.lineTo(ox+i*scx,oy+4);ctx.stroke();LX(ctx,W,H,i+'',ox+i*scx,oy+16,'#64748B',11);}
+      // v 軸刻度
+      if(v0>0){ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ox-4,oy-v0*scy);ctx.lineTo(ox+4,oy-v0*scy);ctx.stroke();LX(ctx,W,H,v0+'',ox-22,oy-v0*scy,'#64748B',11);}
+      // phase 0：初速點
+      ctx.fillStyle=blue;ctx.beginPath();ctx.arc(ox,oy-v0*scy,5,0,Math.PI*2);ctx.fill();
+      LX(ctx,W,H,'v₀='+v0+' m/s',ox+60,oy-v0*scy-16,blue,11,true);
+      // phase 1：畫 v-t 直線
+      if(pi>=1){
+        const ex2=lerp(ox,ox+t*scx,pi===1?e:1),ev=v0+(vf-v0)*(pi===1?e:1);
+        ctx.strokeStyle=blue;ctx.lineWidth=2.5;ctx.beginPath();ctx.moveTo(ox,oy-v0*scy);ctx.lineTo(ex2,oy-ev*scy);ctx.stroke();
+        if(e>0.5){ctx.fillStyle=blue;ctx.beginPath();ctx.arc(ex2,oy-ev*scy,5,0,Math.PI*2);ctx.fill();}
+      }
+      // phase 2：末速（3個phase時從pi>=1開始，4個以上從pi>=2）
+      const showVf=PN<=3?pi>=1:pi>=2;
+      const showArea=PN<=3?pi>=2:pi>=3;
+      if(showVf){
+        ctx.strokeStyle='rgba(55,138,221,0.3)';ctx.lineWidth=1;ctx.setLineDash([5,3]);
+        ctx.beginPath();ctx.moveTo(ox+t*scx,oy-vf*scy);ctx.lineTo(ox+t*scx,oy);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(ox+t*scx,oy-vf*scy);ctx.lineTo(ox,oy-vf*scy);ctx.stroke();
+        ctx.setLineDash([]);
+        ctx.fillStyle=red;ctx.beginPath();ctx.arc(ox+t*scx,oy-vf*scy,6,0,Math.PI*2);ctx.fill();
+        LX(ctx,W,H,'vf='+vf+' m/s',ox+t*scx+52,oy-vf*scy,red,12,true);
+        tBox(ctx,W,H,['v=v₀+at','='+v0+'+('+a+')('+t+')','='+vf+' m/s'],W*0.78,H*0.18,[blue,blue,red],11);
+        ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ox-4,oy-vf*scy);ctx.lineTo(ox+4,oy-vf*scy);ctx.stroke();
+        LX(ctx,W,H,vf+'',ox-24,oy-vf*scy,'#64748B',11);
+      }
+      // phase 3：面積=位移
+      if(showArea){
+        ctx.fillStyle='rgba(55,138,221,0.1)';ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox,oy-v0*scy);ctx.lineTo(ox+t*scx,oy-vf*scy);ctx.lineTo(ox+t*scx,oy);ctx.closePath();ctx.fill();
+        ctx.strokeStyle='rgba(55,138,221,0.3)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox,oy-v0*scy);ctx.lineTo(ox+t*scx,oy-vf*scy);ctx.lineTo(ox+t*scx,oy);ctx.closePath();ctx.stroke();
+        LX(ctx,W,H,'面積 = 位移',ox+t*scx/2,oy-vf*scy/3,blue,11,true);
+        tBox(ctx,W,H,['Δx=v₀t+½at²','='+v0+'×'+t+'+½×'+a+'×'+t+'²','='+dx+' m'],W*0.78,H*0.62,[green,green,green],11);
+        if(e>0.7)ansBox(ctx,W,H,ans);
+      }
+    });
+  }
+
+  // ── 彈簧組 spring ────────────────────────────────────
+  if(gtype==='spring'){
+    const k1=gp.k1||3,k2=gp.k2||4,k3=gp.k3||4,k4=gp.k4||4;
+    const kUp=gp.kUp!==undefined?gp.kUp:(k1+k2);
+    const kDown=gp.kDown!==undefined?gp.kDown:parseFloat((1/(1/k3+1/k4)).toFixed(2));
+    const kTotal=gp.kTotal!==undefined?gp.kTotal:parseFloat((kUp+kDown).toFixed(2));
+    function drawSpring(ctx,x,y,len,col){
+      const coils=5,cw=16;ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x,y+len*0.1);
+      for(let i=0;i<coils;i++){const sy=y+len*0.1+i*(len*0.8/coils);ctx.lineTo(x+(i%2===0?cw:-cw),sy+len*0.8/coils*0.5);ctx.lineTo(x,sy+len*0.8/coils);}
+      ctx.lineTo(x,y+len);ctx.stroke();
+    }
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const cx=W/2,gap=60,sh=75;
+      ctx.fillStyle='#94A3B8';ctx.fillRect(cx-gap-36,20,gap*2+72,8);
+      for(let i=0;i<7;i++){ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx-gap-30+i*18,28);ctx.lineTo(cx-gap-40+i*18,40);ctx.stroke();}
+      drawSpring(ctx,cx-gap,28,sh,pi===0?blue:fgm);
+      drawSpring(ctx,cx+gap,28,sh,pi===0?blue:fgm);
+      LX(ctx,W,H,'K₁='+k1,cx-gap-36,28+sh/2,pi===0?blue:fgm,11);
+      LX(ctx,W,H,'K₂='+k2,cx+gap+36,28+sh/2,pi===0?blue:fgm,11);
+      const my=28+sh,mw=130,mh=34;
+      ctx.fillStyle='rgba(24,95,165,0.1)';ctx.strokeStyle=fgm;ctx.lineWidth=2;
+      ctx.fillRect(cx-mw/2,my,mw,mh);ctx.strokeRect(cx-mw/2,my,mw,mh);
+      LX(ctx,W,H,'M',cx,my+mh/2,fg,13,true);
+      drawSpring(ctx,cx,my+mh,sh*0.65,pi>=1?red:fgm);
+      LX(ctx,W,H,'K₃='+k3,cx+34,my+mh+sh*0.32,pi>=1?red:fgm,11);
+      drawSpring(ctx,cx,my+mh+sh*0.65,sh*0.65,pi>=1?red:fgm);
+      LX(ctx,W,H,'K₄='+k4,cx+34,my+mh+sh*0.97,pi>=1?red:fgm,11);
+      ctx.fillStyle='#94A3B8';ctx.fillRect(cx-60,my+mh+sh*1.35,120,8);
+      for(let i=0;i<5;i++){ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(cx-48+i*22,my+mh+sh*1.35+8);ctx.lineTo(cx-58+i*22,my+mh+sh*1.35+20);ctx.stroke();}
+      if(pi===1)tBox(ctx,W,H,['並聯：K上=K₁+K₂','='+k1+'+'+k2+'='+kUp+' N/mm'],W*0.82,H*0.22,[blue,blue],11);
+      if(pi===2)tBox(ctx,W,H,['串聯：1/K下=1/K₃+1/K₄','K下='+kDown+' N/mm'],W*0.82,H*0.7,[red,red],11);
+      if(pi===PN-1){tBox(ctx,W,H,['K=K上+K下','='+kUp+'+'+kDown+'='+kTotal+' N/mm'],W*0.82,H*0.82,[green,green],11);if(e>0.7)ansBox(ctx,W,H,ans);}
+    });
+  }
+
+  // ── 齒輪組 gear ──────────────────────────────────────
+  if(gtype==='gear'){
+    const z1=gp.z1||20,z2=gp.z2||60,n1=gp.n1||300;
+    const n2=gp.n2!==undefined?gp.n2:parseFloat((n1*z1/z2).toFixed(1));
+    const ratio=parseFloat((z2/z1).toFixed(2));
+    function drawGear(ctx,cx,cy,r,teeth,col){
+      ctx.strokeStyle=col;ctx.lineWidth=1.8;ctx.beginPath();const ir=r*0.82;
+      for(let i=0;i<teeth;i++){const a1=(i/teeth)*Math.PI*2,a2=((i+0.4)/teeth)*Math.PI*2,a3=((i+0.6)/teeth)*Math.PI*2,a4=((i+1)/teeth)*Math.PI*2;
+        if(i===0)ctx.moveTo(cx+ir*Math.cos(a1),cy+ir*Math.sin(a1));else ctx.lineTo(cx+ir*Math.cos(a1),cy+ir*Math.sin(a1));
+        ctx.lineTo(cx+r*Math.cos(a2),cy+r*Math.sin(a2));ctx.lineTo(cx+r*Math.cos(a3),cy+r*Math.sin(a3));ctx.lineTo(cx+ir*Math.cos(a4),cy+ir*Math.sin(a4));}
+      ctx.closePath();ctx.stroke();ctx.beginPath();ctx.arc(cx,cy,r*0.15,0,Math.PI*2);ctx.stroke();
+    }
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const r1=52,r2=Math.min(52*z2/z1,100),cx1=W*0.32,cx2=W*0.68,cy=H/2;
+      drawGear(ctx,cx1,cy,r1,z1,pi===0?blue:fgm);drawGear(ctx,cx2,cy,r2,z2,pi===0?red:fgm);
+      ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.setLineDash([4,3]);ctx.beginPath();ctx.moveTo(cx1+r1,cy);ctx.lineTo(cx2-r2,cy);ctx.stroke();ctx.setLineDash([]);
+      LX(ctx,W,H,'Z₁='+z1,cx1,cy+r1+18,blue,11,true);LX(ctx,W,H,'Z₂='+z2,cx2,cy+r2+18,red,11,true);
+      if(pi>=1){LX(ctx,W,H,'n₁='+n1+' rpm',cx1,cy-r1-18,blue,11);tBox(ctx,W,H,['速比=Z₂/Z₁='+ratio,'n₂=n₁×Z₁/Z₂','='+n2+' rpm'],W*0.5,H*0.2,[blue,blue,red],11);}
+      if(pi===PN-1){LX(ctx,W,H,'n₂='+n2+' rpm',cx2,cy-r2-18,red,11);if(e>0.7)ansBox(ctx,W,H,ans);}
+    });
+  }
+
+  // ── 皮帶輪 pulley ────────────────────────────────────
+  if(gtype==='pulley'){
+    const d1=gp.d1||100,d2=gp.d2||200,n1=gp.n1||300;
+    const n2=gp.n2!==undefined?gp.n2:parseFloat((n1*d1/d2).toFixed(1));
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const r1=d1*0.28,r2=Math.min(d2*0.28,110),cx1=W*0.28,cx2=W*0.72,cy=H/2;
+      ctx.strokeStyle='rgba(100,116,139,0.35)';ctx.lineWidth=7;
+      ctx.beginPath();ctx.moveTo(cx1,cy-r1);ctx.lineTo(cx2,cy-r2);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx1,cy+r1);ctx.lineTo(cx2,cy+r2);ctx.stroke();
+      ctx.strokeStyle=pi===0?blue:fgm;ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.arc(cx1,cy,r1,0,Math.PI*2);ctx.stroke();
+      ctx.beginPath();ctx.arc(cx2,cy,r2,0,Math.PI*2);ctx.stroke();
+      [cx1,cx2].forEach(cx=>{ctx.fillStyle='#64748B';ctx.beginPath();ctx.arc(cx,cy,4,0,Math.PI*2);ctx.fill();});
+      LX(ctx,W,H,'D₁='+d1,cx1,cy+r1+20,pi>=1?blue:fgm,11,true);LX(ctx,W,H,'D₂='+d2,cx2,cy+r2+20,pi>=1?red:fgm,11,true);
+      if(pi>=1){LX(ctx,W,H,'n₁='+n1+' rpm',cx1,cy-r1-20,blue,11);tBox(ctx,W,H,['n₁D₁=n₂D₂','n₂='+n1+'×'+d1+'/'+d2,'='+n2+' rpm'],W*0.5,H*0.2,[blue,blue,red],11);}
+      if(pi===PN-1){LX(ctx,W,H,'n₂='+n2+' rpm',cx2,cy-r2-20,red,11);if(e>0.7)ansBox(ctx,W,H,ans);}
+    });
+  }
+
+  // ── 圓的方程式 circle ────────────────────────────────
+  if(gtype==='circle'){
+    // graphParams：h,k,r = 原始圓；nh,nk,nr = 新圓（若無則只畫一個圓）
+    const h=gp.h!==undefined?+gp.h:0;
+    const k=gp.k!==undefined?+gp.k:0;
+    const r=gp.r!==undefined?+gp.r:5;
+    const hasNew=gp.nh!==undefined||gp.nk!==undefined||gp.nr!==undefined;
+    const nh=gp.nh!==undefined?+gp.nh:h;
+    const nk=gp.nk!==undefined?+gp.nk:k;
+    const nr=gp.nr!==undefined?+gp.nr:r/2;
+
+    // 從 phases formula 嘗試解析新圓圓心與半徑
+    let ph=nh,pk=nk,pr=nr;
+    phases.forEach(p=>{
+      const f=(p.formula||'');
+      // 抓 (x-a)²+(y-b)²=r² 形式
+      const m=f.match(/\(x([+-]\d+\.?\d*)?\).*\(y([+-]\d+\.?\d*)?\).*=\s*(\d+\.?\d*)/);
+      if(m){
+        ph=m[1]?-parseFloat(m[1]):0;
+        pk=m[2]?-parseFloat(m[2]):0;
+        pr=Math.sqrt(parseFloat(m[3]));
+      }
+    });
+
+    // 圓方程式字串輔助
+    function circleEq(ch,ck,cr){
+      const xs=ch===0?'x²':'(x'+(ch>0?'-'+ch:'+'+Math.abs(ch))+')²';
+      const ys=ck===0?'y²':'(y'+(ck>0?'-'+ck:'+'+Math.abs(ck))+')²';
+      return xs+'+'+ys+'='+Math.round(cr*cr*100)/100;
+    }
+
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+
+      // 計算合理縮放：包含原圓和新圓
+      const allH=[h,ph],allK=[k,pk],allR=[r,pr];
+      const maxExt=Math.max(...allH.map((hh,i)=>Math.abs(hh)+allR[i]*1.2),
+                            ...allK.map((kk,i)=>Math.abs(kk)+allR[i]*1.2), 3);
+      const sc=Math.min((W-80)/(maxExt*2),(H-60)/(maxExt*2),30);
+      const cx=W/2,cy=H/2;
+
+      // 網格
+      const gridStep=sc*(Math.ceil(maxExt/5)*1);
+      ctx.strokeStyle='rgba(55,138,221,0.10)';ctx.lineWidth=0.5;
+      for(let x=cx%gridStep;x<=W;x+=gridStep){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+      for(let y=cy%gridStep;y<=H;y+=gridStep){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+      // 座標軸
+      ctx.strokeStyle='rgba(55,138,221,0.45)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(10,cy);ctx.lineTo(W-10,cy);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx,10);ctx.lineTo(cx,H-10);ctx.stroke();
+      // 原點標記
+      ctx.fillStyle='#94A3B8';ctx.font='10px system-ui';ctx.textAlign='right';ctx.textBaseline='top';
+      ctx.fillText('O',cx-4,cy+3);
+
+      // 原圓像素位置
+      const ox=cx+h*sc,oy=cy-k*sc,rp=r*sc;
+      // 新圓像素位置
+      const nox=cx+ph*sc,noy=cy-pk*sc,nrp=pr*sc;
+
+      if(pi===0){
+        // step 0：畫原圓 + 原圓圓心標籤 + 半徑線
+        ctx.strokeStyle=blue;ctx.lineWidth=2;ctx.fillStyle='rgba(55,138,221,0.08)';
+        ctx.beginPath();ctx.arc(ox,oy,rp*e,0,Math.PI*2);ctx.fill();ctx.stroke();
+        if(e>0.3){
+          ctx.fillStyle=blue;ctx.beginPath();ctx.arc(ox,oy,4.5,0,Math.PI*2);ctx.fill();
+          LX(ctx,W,H,'圓心('+h+','+k+')',ox+(h>=0?38:-60),oy-14,blue,12,true);
+          ctx.strokeStyle=blue;ctx.lineWidth=1.3;ctx.setLineDash([4,3]);
+          ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox+rp,oy);ctx.stroke();ctx.setLineDash([]);
+          LX(ctx,W,H,'r='+r,ox+rp/2,oy-15,blue,11,true);
+        }
+        // 左下角：原圓方程式
+        const lines0=['原圓：',circleEq(h,k,r)];
+        safeBoxCircle(ctx,W,H,lines0,blue);
+      }
+      else if(pi===1){
+        // step 1：原圓淡化 + 標出新圓心位置
+        ctx.strokeStyle='rgba(55,138,221,0.25)';ctx.lineWidth=1.5;ctx.fillStyle='rgba(55,138,221,0.04)';
+        ctx.beginPath();ctx.arc(ox,oy,rp,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.fillStyle='rgba(55,138,221,0.35)';ctx.beginPath();ctx.arc(ox,oy,4,0,Math.PI*2);ctx.fill();
+        // 新圓心（紅色）
+        ctx.fillStyle=red;ctx.beginPath();ctx.arc(nox,noy,5.5*e,0,Math.PI*2);ctx.fill();
+        if(e>0.4)LX(ctx,W,H,'新圓心('+ph+','+pk+')',nox+(ph>=0?40:-64),noy-15,red,12,true);
+        // 新半徑線（虛線）
+        if(e>0.6){
+          ctx.strokeStyle=green;ctx.lineWidth=1.3;ctx.setLineDash([4,3]);
+          ctx.beginPath();ctx.moveTo(nox,noy);ctx.lineTo(nox+nrp,noy);ctx.stroke();ctx.setLineDash([]);
+          LX(ctx,W,H,'r='+pr,nox+nrp/2,noy-15,green,11,true);
+        }
+        safeBoxCircle(ctx,W,H,['原圓心:('+h+','+k+')',  '新圓心:('+ph+','+pk+')','新半徑：r='+pr],red);
+      }
+      else if(pi===2){
+        // step 2：畫出新圓（紅色）與原圓（藍淡）對比
+        ctx.strokeStyle='rgba(55,138,221,0.25)';ctx.lineWidth=1.5;ctx.fillStyle='rgba(55,138,221,0.04)';
+        ctx.beginPath();ctx.arc(ox,oy,rp,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.fillStyle='rgba(55,138,221,0.35)';ctx.beginPath();ctx.arc(ox,oy,4,0,Math.PI*2);ctx.fill();
+        LX(ctx,W,H,'原圓',ox+(h>=0?-45:10),oy+rp*0.7,blue,12,false);
+        // 新圓
+        ctx.strokeStyle=red;ctx.lineWidth=2.2;ctx.fillStyle='rgba(163,45,45,0.08)';
+        ctx.beginPath();ctx.arc(nox,noy,nrp*e,0,Math.PI*2);ctx.fill();ctx.stroke();
+        if(e>0.5){
+          ctx.fillStyle=red;ctx.beginPath();ctx.arc(nox,noy,5,0,Math.PI*2);ctx.fill();
+          LX(ctx,W,H,'('+ph+','+pk+')',nox+(ph>=0?36:-60),noy-14,red,12,true);
+          ctx.strokeStyle=green;ctx.lineWidth=1.3;ctx.setLineDash([4,3]);
+          ctx.beginPath();ctx.moveTo(nox,noy);ctx.lineTo(nox+nrp,noy);ctx.stroke();ctx.setLineDash([]);
+          LX(ctx,W,H,'r='+pr,nox+nrp/2,noy-14,green,11,true);
+        }
+        safeBoxCircle(ctx,W,H,['新圓：',circleEq(ph,pk,pr)],red);
+      }
+      else{
+        // step 3：標準式 + 展開式
+        ctx.strokeStyle='rgba(55,138,221,0.20)';ctx.lineWidth=1.3;ctx.fillStyle='rgba(55,138,221,0.03)';
+        ctx.beginPath();ctx.arc(ox,oy,rp,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.strokeStyle=red;ctx.lineWidth=2.2;ctx.fillStyle='rgba(163,45,45,0.08)';
+        ctx.beginPath();ctx.arc(nox,noy,nrp,0,Math.PI*2);ctx.fill();ctx.stroke();
+        ctx.fillStyle=red;ctx.beginPath();ctx.arc(nox,noy,5,0,Math.PI*2);ctx.fill();
+        // 標準式顯示在圓上方
+        if(e>0.5){
+          const eq=circleEq(ph,pk,pr);
+          tBox(ctx,W,H,[eq],nox,noy-nrp-22,[red],11);
+        }
+        // 答案放左下角
+        if(e>0.7&&ans)safeBoxCircle(ctx,W,H,['答案：',ans],green);
+      }
+    });
+
+    // 圓形專用 safeBox（不依賴外部，直接定義在此）
+    function safeBoxCircle(ctx,W,H,lines,col){
+      const s=11,lh=s*1.7,px=10,py=7;
+      ctx.font='600 '+s+'px \'Noto Sans TC\',system-ui,sans-serif';
+      let mw=0;lines.forEach((l,i)=>{ctx.font=(i===0?'600':'400')+' '+s+'px \'Noto Sans TC\',system-ui,sans-serif';const w=ctx.measureText(String(l)).width;if(w>mw)mw=w;});
+      const bw=mw+px*2,bh=lines.length*lh+py*2,bx=8,by=H-bh-8;
+      ctx.fillStyle='rgba(255,255,255,0.95)';ctx.strokeStyle=col;ctx.lineWidth=0.9;
+      ctx.beginPath();ctx.roundRect(bx,by,bw,bh,5);ctx.fill();ctx.stroke();
+      lines.forEach((l,i)=>{
+        ctx.fillStyle=i===0?col:'#334155';
+        ctx.font=(i===0?'600':'400')+' '+s+'px \'Noto Sans TC\',system-ui,sans-serif';
+        ctx.textAlign='left';ctx.textBaseline='middle';
+        ctx.fillText(String(l),bx+px,by+py+i*lh+lh/2);
+      });
+    }
+  }
+
+  // ── 圓周運動／向心力／彎道最高速限 circular_motion ────
+  // 適用：彎道最高速限、向心力、離心力、圓周運動摩擦力等題型
+  // （這類題目以前沒有對應圖表，AI 只能誤套用普通數學圓 circle，圖跟題目對不上）
+  if(gtype==='circular_motion'){
+    const R=gp.R||80, mu=(gp.mu!==undefined&&gp.mu!==null)?gp.mu:0.5, g=gp.g||10;
+    const vCalc=(gp.v!==undefined&&gp.v!==null)?gp.v:parseFloat(Math.sqrt(mu*g*R).toFixed(2));
+    const vkmh=(gp.vkmh!==undefined&&gp.vkmh!==null)?gp.vkmh:parseFloat((vCalc*3.6).toFixed(1));
+    const rp=108; // 固定顯示半徑（像素）。彎道半徑R可能是10~200公尺不等，用固定視覺半徑＋文字標示實際數值，避免依賴R的大小縮放導致圖形跑掉或消失
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const cx=W*0.40,cy=H/2;
+      // 彎道（俯視圖）
+      ctx.fillStyle='rgba(55,138,221,0.05)';
+      ctx.beginPath();ctx.arc(cx,cy,rp,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=blue;ctx.lineWidth=2.2;
+      ctx.beginPath();ctx.arc(cx,cy,rp,0,Math.PI*2*(pi===0?e:1));ctx.stroke();
+      ctx.fillStyle='#475569';ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();
+      LX(ctx,W,H,'彎道中心',cx,cy-16,'#475569',12);
+
+      // 車輛位置（圓上右下方45度處，避開上方文字框）
+      const ang=Math.PI/5;
+      const carx=cx+rp*Math.cos(ang), cary=cy+rp*Math.sin(ang);
+      const ux=Math.cos(ang), uy=Math.sin(ang); // 由中心指向車（半徑方向，單位向量）
+
+      // 半徑虛線＋R標示
+      ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.setLineDash([4,3]);
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(carx*(pi===0?e:1)+cx*(1-(pi===0?e:1)),cary*(pi===0?e:1)+cy*(1-(pi===0?e:1)));ctx.stroke();
+      ctx.setLineDash([]);
+      LX(ctx,W,H,'R='+R+' m',cx+rp*ux*0.55,cy+rp*uy*0.55-14,'#334155',13,true);
+
+      // 車輛位置點
+      ctx.fillStyle='#1E293B';ctx.beginPath();ctx.arc(carx,cary,6,0,Math.PI*2);ctx.fill();
+
+      if(pi===0){
+        tBox(ctx,W,H,['已知條件：','R='+R+' m，μ='+mu,'g='+g+' m/s²'],W*0.78,H*0.16,['#475569','#475569',blue],13);
+      }
+
+      if(pi>=1){
+        // 向心力（摩擦力）：由車指向圓心
+        const flen=52*(pi===1?e:1);
+        arrowX(ctx,carx,cary,carx-ux*flen,cary-uy*flen,red,2.8);
+        LX(ctx,W,H,'f_s（向心力）',carx-ux*68,cary-uy*68,red,13,true);
+        if(pi===1)tBox(ctx,W,H,['最大靜摩擦力：','f_s_max = μN = μmg','（提供向心力，方向指向圓心）'],W*0.78,H*0.16,[red,red,red],13);
+      }
+
+      if(pi>=2){
+        // 速度向量：切線方向（垂直於半徑）
+        const tx=-uy, ty=ux;
+        const vlen=58*(pi===2?e:1);
+        arrowX(ctx,carx,cary,carx+tx*vlen,cary+ty*vlen,green,2.8);
+        LX(ctx,W,H,'v',carx+tx*72,cary+ty*72,green,14,true);
+        tBox(ctx,W,H,['mv²/R = μmg','v² = μgR','v = √(μgR) = √('+mu+'×'+g+'×'+R+')','= '+vCalc+' m/s'],W*0.78,H*0.66,[blue,blue,blue,green],13);
+      }
+
+      if(pi===PN-1&&e>0.6){
+        ansBox(ctx,W,H,ans||(vkmh+' km/hr'));
+      }
+    });
+  }
+
+  // ── 向量合力 vector ──────────────────────────────────
+  if(gtype==='vector'){
+    const f1=gp.f1||3,f2=gp.f2||4,angle=gp.angle||90;
+    const ar=angle*Math.PI/180;
+    const fr=parseFloat(Math.sqrt(f1*f1+f2*f2+2*f1*f2*Math.cos(ar)).toFixed(2));
+    const sc=Math.min((W-120)/(f1+f2+2),(H-120)/(f2+2),22);
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const ox=W*0.18,oy=H*0.72;
+      if(pi>=0){arrowX(ctx,ox,oy,ox+f1*sc*(pi===0?e:1),oy,blue,2.5);LX(ctx,W,H,'F₁='+f1,ox+f1*sc/2,oy+20,blue,11,true);}
+      if(pi>=1){const f2x=f2*Math.cos(ar-Math.PI/2)*sc,f2y=-f2*Math.sin(ar-Math.PI/2)*sc;arrowX(ctx,ox,oy,ox+f2x*(pi===1?e:1),oy+f2y*(pi===1?e:1),red,2.5);LX(ctx,W,H,'F₂='+f2,ox+f2x/2-28,oy+f2y/2,red,11,true);}
+      if(pi>=2){
+        const frx=f1*sc+f2*Math.cos(ar-Math.PI/2)*sc,fry=-f2*Math.sin(ar-Math.PI/2)*sc;
+        ctx.setLineDash([4,3]);ctx.strokeStyle=fgm;ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(ox+f1*sc,oy);ctx.lineTo(ox+frx,oy+fry);ctx.stroke();ctx.setLineDash([]);
+        arrowX(ctx,ox,oy,ox+frx*(pi===2?e:1),oy+fry*(pi===2?e:1),purple,3);
+        LX(ctx,W,H,'R≈'+fr,ox+frx/2+16,oy+fry/2-16,purple,12,true);
+        tBox(ctx,W,H,['R=√(F₁²+F₂²+2F₁F₂cosθ)','≈'+fr],W*0.72,H*0.2,[purple,purple],11);
+      }
+      if(pi===PN-1&&e>0.7)ansBox(ctx,W,H,ans);
+    });
+  }
+
+  // ── 直線函數 linear ──────────────────────────────────
+  if(gtype==='linear'){
+    const m=gp.m||2,b=gp.b||1;
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const cx=W/2,cy=H/2,sc=W/14;
+      ctx.strokeStyle='rgba(55,138,221,0.12)';ctx.lineWidth=0.5;
+      for(let x=0;x<=W;x+=sc){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,H);ctx.stroke();}
+      for(let y=0;y<=H;y+=sc){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(W,y);ctx.stroke();}
+      ctx.strokeStyle='rgba(55,138,221,0.45)';ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(10,cy);ctx.lineTo(W-10,cy);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx,10);ctx.lineTo(cx,H-10);ctx.stroke();
+      ctx.strokeStyle=blue;ctx.lineWidth=2.2;ctx.beginPath();let first=true;
+      for(let px=0;px<W*(pi===0?e:1);px++){const xv=(px-cx)/sc,yv=m*xv+b,py=cy-yv*sc;if(py>-10&&py<H+10){first?ctx.moveTo(px,py):ctx.lineTo(px,py);first=false;}}
+      ctx.stroke();LX(ctx,W,H,'y='+m+'x'+(b===0?'':(b>0?'+'+b:b)),22,14,blue,10);
+      if(pi>=1){ctx.fillStyle=red;ctx.beginPath();ctx.arc(cx,cy-b*sc,5,0,Math.PI*2);ctx.fill();LX(ctx,W,H,'(0,'+b+')',cx+34,cy-b*sc-14,red,12,true);}
+      if(pi>=2){const xi=-b/m;ctx.fillStyle=green;ctx.beginPath();ctx.arc(cx+xi*sc,cy,5,0,Math.PI*2);ctx.fill();LX(ctx,W,H,'('+xi.toFixed(1)+',0)',cx+xi*sc,cy+18,green,12,true);}
+      if(pi===PN-1&&e>0.5)ansBox(ctx,W,H,ans);
+    });
+  }
+
+  // ── 直流電路 dc_circuit ──────────────────────────────
+  if(gtype==='dc_circuit'){
+    const r1=gp.r1||4,r2=gp.r2||6,v=gp.v||12,series=gp.series!==false;
+    const rt=series?(r1+r2):parseFloat((r1*r2/(r1+r2)).toFixed(2));
+    const it=parseFloat((v/rt).toFixed(2)),v1=parseFloat((it*r1).toFixed(1)),v2=parseFloat((it*r2).toFixed(1));
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      if(series){
+        const x0=60,y0=H/2-50,w=W-120,h=100;
+        ctx.strokeStyle=pi===0?blue:fgm;ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+w,y0);ctx.lineTo(x0+w,y0+h);ctx.lineTo(x0,y0+h);ctx.lineTo(x0,y0);ctx.stroke();
+        LX(ctx,W,H,'V='+v+'V',x0-30,y0+h/2,pi>=1?blue:fgm,11,true);
+        const r1x=x0+w*0.3,r2x=x0+w*0.7;
+        ctx.strokeStyle=pi>=1?red:fgm;ctx.lineWidth=1.5;
+        ctx.strokeRect(r1x-22,y0-14,44,28);LX(ctx,W,H,'R₁='+r1+'Ω',r1x,y0-24,pi>=1?red:fgm,11);
+        ctx.strokeRect(r2x-22,y0-14,44,28);LX(ctx,W,H,'R₂='+r2+'Ω',r2x,y0-24,pi>=1?red:fgm,11);
+        if(pi>=1)tBox(ctx,W,H,['Rt=R₁+R₂='+rt+'Ω','I=V/Rt='+it+'A'],W*0.5,H*0.75,[blue,blue],11);
+        if(pi>=2)tBox(ctx,W,H,['V₁='+v1+'V','V₂='+v2+'V'],W*0.82,H*0.75,[red,red],11);
+      }else{
+        const x0=80,y0=H/2-45,h=90,w=W-160;
+        ctx.strokeStyle=pi===0?blue:fgm;ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x0+w,y0);ctx.lineTo(x0+w,y0+h);ctx.lineTo(x0,y0+h);ctx.lineTo(x0,y0);ctx.stroke();
+        LX(ctx,W,H,'V='+v+'V',x0-30,y0+h/2,pi>=1?blue:fgm,11,true);
+        const rx1=x0+w*0.35,rx2=x0+w*0.65,ry=y0+h/2;
+        ctx.strokeStyle=pi>=1?red:fgm;ctx.lineWidth=1.5;
+        ctx.strokeRect(rx1-18,ry-14,36,28);LX(ctx,W,H,'R₁='+r1+'Ω',rx1,ry-26,pi>=1?red:fgm,11);
+        ctx.strokeRect(rx2-18,ry-14,36,28);LX(ctx,W,H,'R₂='+r2+'Ω',rx2,ry-26,pi>=1?red:fgm,11);
+        if(pi>=1)tBox(ctx,W,H,['1/Rt=1/R₁+1/R₂','Rt='+rt+'Ω','I='+it+'A'],W*0.5,H*0.8,[blue,blue,blue],11);
+      }
+      if(pi===PN-1&&e>0.7)ansBox(ctx,W,H,ans);
+    });
+  }
+
+  // ── 功率三角形 power ─────────────────────────────────
+  if(gtype==='power'){
+    const P=gp.P||3,Q=gp.Q||4;
+    const S=gp.S!==undefined?gp.S:parseFloat(Math.sqrt(P*P+Q*Q).toFixed(2));
+    const pf=parseFloat((P/S).toFixed(3));
+    const sc=Math.min((W-120)/(S+1),(H-120)/(Q+1),28);
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const ox=W*0.15,oy=H*0.75;
+      if(pi>=0){arrowX(ctx,ox,oy,ox+P*sc*(pi===0?e:1),oy,blue,2.5);LX(ctx,W,H,'P='+P+' kW',ox+P*sc/2,oy+20,blue,11,true);}
+      if(pi>=1){arrowX(ctx,ox+P*sc,oy,ox+P*sc,oy-Q*sc*(pi===1?e:1),red,2.5);LX(ctx,W,H,'Q='+Q+' kVAR',ox+P*sc+38,oy-Q*sc/2,red,11,true);}
+      if(pi>=2){
+        ctx.setLineDash([4,3]);ctx.strokeStyle=fgm;ctx.lineWidth=1;
+        ctx.beginPath();ctx.moveTo(ox,oy-Q*sc);ctx.lineTo(ox+P*sc,oy-Q*sc);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(ox,oy-Q*sc);ctx.stroke();ctx.setLineDash([]);
+        arrowX(ctx,ox,oy,ox+P*sc*(pi===2?e:1),oy-Q*sc*(pi===2?e:1),purple,3);
+        LX(ctx,W,H,'S='+S+' kVA',(ox*2+P*sc)/2-20,(oy*2-Q*sc)/2-14,purple,11,true);
+        tBox(ctx,W,H,['S=√(P²+Q²)='+S+' kVA','cosφ=P/S='+pf],W*0.78,H*0.22,[purple,green],11);
+      }
+      if(pi===PN-1&&e>0.7)ansBox(ctx,W,H,ans);
+    });
+  }
+
+  // ── 圓盤摩擦傳動 friction_disc ───────────────────────
+  if(gtype==='friction_disc'){
+    let Ro=gp.Ro||30,Ri=gp.Ri||20,mu=gp.mu||0.2,T=gp.T||80,F=gp.F||160;
+    let RavgRaw=gp.Ravg;
+    // ── 單位防呆：AI 有時會把 Ro/Ri 換算成公尺（如0.03）而不是毫米（30），
+    // 導致圓盤半徑算出來只有零點零幾像素、整個圖形消失。
+    // 偵測到數值明顯小於1（不可能是真實的毫米尺寸）就自動乘1000轉回mm。
+    if(Ro>0&&Ro<1) Ro=parseFloat((Ro*1000).toFixed(2));
+    if(Ri>0&&Ri<1) Ri=parseFloat((Ri*1000).toFixed(2));
+    if(RavgRaw!==undefined&&RavgRaw>0&&RavgRaw<1) RavgRaw=parseFloat((RavgRaw*1000).toFixed(2));
+    // T 同理：如果明顯小於10，很可能已經被換算成 N-m，顯示時改標單位避免誤導
+    const tUnit=(T>0&&T<10)?'N-m':'N-cm';
+    const Ravg=RavgRaw||parseFloat(((Ro+Ri)/2).toFixed(1));
+    // ── 初始「題目」畫面：只顯示已知條件，不出現任何計算結果 ──
+    const introFn=(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const cx=W*0.40,cy=H/2,sc=Math.min((W*0.48)/(Ro+14),(H-80)/(Ro*2+14),2.5);
+      const ro=Ro*sc,ri=Ri*sc;
+      ctx.fillStyle='rgba(55,138,221,0.06)';
+      ctx.beginPath();ctx.arc(cx,cy,ro,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=blue;ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(cx,cy,ro,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle='#F0F5FB';ctx.beginPath();ctx.arc(cx,cy,ri,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=blue;ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(cx,cy,ri,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle='#94A3B8';ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();
+      const ext=Math.min(e,1);
+      ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+ro*ext,cy);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx,cy-ri*ext);ctx.stroke();
+      ctx.setLineDash([]);
+      LX(ctx,W,H,'Ro='+Ro+'mm',cx+ro/2,cy+18,'#64748B',13);
+      LX(ctx,W,H,'Ri='+Ri+'mm',cx+12,cy-ri/2-8,'#64748B',13);
+      tBox(ctx,W,H,['外徑 Ro='+Ro+'mm','內徑 Ri='+Ri+'mm','μ='+mu+'  T='+T+' '+tUnit],W*0.82,H*0.2,['#64748B','#64748B',blue],13);
+    };
+    const stepFns=phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const cx=W*0.40,cy=H/2,sc=Math.min((W*0.48)/(Ro+14),(H-80)/(Ro*2+14),2.5);
+      const ro=Ro*sc,ri=Ri*sc,ravg=Ravg*sc;
+      const isLast=pi===PN-1;
+      // 依 formula 內容決定顯示什麼
+      const formula=(phases[pi]&&phases[pi].formula)||'';
+      const hasRavg=formula.includes('Ravg')||formula.includes('avg')||formula.includes('R_avg');
+      const hasF=formula.includes('F=')||formula.includes('='+F)||isLast;
+
+      // ── 圓盤底圖（永遠）──
+      ctx.fillStyle=isLast?'rgba(239,159,39,0.12)':'rgba(55,138,221,0.06)';
+      ctx.beginPath();ctx.arc(cx,cy,ro,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=isLast?amber:blue;ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(cx,cy,ro,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle='#F0F5FB';ctx.beginPath();ctx.arc(cx,cy,ri,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=isLast?amber:blue;ctx.lineWidth=1.5;
+      ctx.beginPath();ctx.arc(cx,cy,ri,0,Math.PI*2);ctx.stroke();
+      ctx.fillStyle='#94A3B8';ctx.beginPath();ctx.arc(cx,cy,3,0,Math.PI*2);ctx.fill();
+      if(isLast)LX(ctx,W,H,'摩擦面',cx,cy,amber,13,true);
+
+      // ── Ro Ri 標示（永遠）──
+      ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+ro*(pi===0?e:1),cy);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx,cy-ri*(pi===0?e:1));ctx.stroke();
+      ctx.setLineDash([]);
+      LX(ctx,W,H,'Ro='+Ro+'mm',cx+ro/2,cy+18,'#64748B',13);
+      LX(ctx,W,H,'Ri='+Ri+'mm',cx+12,cy-ri/2-8,'#64748B',13);
+
+      // ── phase 0 沒有 Ravg 和 F：顯示已知條件 ──
+      if(pi===0&&!hasRavg&&!hasF){
+        tBox(ctx,W,H,['外徑 '+Ro+'mm → Ro='+Ro/10+'cm','內徑 '+Ri+'mm → Ri='+Ri/10+'cm','μ='+mu+'  T='+T+' '+tUnit],W*0.82,H*0.2,['#64748B','#64748B',blue],13);
+      }
+
+      // ── 有 Ravg：畫紅線 ──
+      if(hasRavg){
+        ctx.strokeStyle=red;ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+ravg*(pi===PN-2&&!isLast?e:1),cy-8);ctx.stroke();
+        ctx.fillStyle=red;ctx.beginPath();ctx.arc(cx+ravg,cy-8,5,0,Math.PI*2);ctx.fill();
+        LX(ctx,W,H,'Ravg='+Ravg+'mm',cx+ravg+50,cy-24,red,13,true);
+        if(!hasF)tBox(ctx,W,H,['Ravg=(Ro+Ri)/2','=('+Ro+'+'+Ri+')/2','='+Ravg+' mm'],W*0.82,H*0.2,[red,red,red],13);
+      }
+
+      // ── 有 F（最後格）：推力箭頭 + 答案 ──
+      if(hasF){
+        // Ravg 線也要保留
+        if(!hasRavg){
+          ctx.strokeStyle=red;ctx.lineWidth=1.5;
+          ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+ravg,cy-8);ctx.stroke();
+          ctx.fillStyle=red;ctx.beginPath();ctx.arc(cx+ravg,cy-8,5,0,Math.PI*2);ctx.fill();
+          LX(ctx,W,H,'Ravg='+Ravg+'mm',cx+ravg+50,cy-24,red,13,true);
+        }
+        const arx=Math.min(cx+ro+16,W-88);
+        const alx=Math.max(cx-ro-16,50);
+        arrowX(ctx,arx+38,cy,arx+6,cy,green,3);
+        arrowX(ctx,alx-38,cy,alx-6,cy,green,3);
+        LX(ctx,W,H,'F='+F+' N',arx+62,cy,green,14,true);
+        tBox(ctx,W,H,['F=T/(μ×Ravg)','='+T+'/('+mu+'×'+Ravg+')','='+F+' N'],W*0.82,H*0.62,[blue,blue,green],13);
+        if(e>0.7)ansBox(ctx,W,H,ans);
+      }
+    });
+    return [introFn,...stepFns];
+  }
+
+  // ── 線性規劃 linear_programming / lp ────────────────
+  if(gtype==='linear_programming'||gtype==='lp'){
+    let gcons=(gp.constraints&&gp.constraints.length)?gp.constraints:[];
+    let gverts=(gp.vertices&&gp.vertices.length)?gp.vertices:[];
+    let gopt=gp.optVertex||null;
+
+    // ── 從 phases.formula 解析不等式（加強版 v3）──
+    if(gcons.length===0){
+      // 合併所有 phases 的 formula，統一符號為 ASCII
+      const rawAll=phases.map(p=>(p.formula||'')+';'+(p.title||'')).join(';')
+        +';'+(ans||'');
+      const f=rawAll
+        .replace(/≦|≤/g,'<=').replace(/≧|≥/g,'>=')
+        .replace(/＋/g,'+').replace(/－/g,'-').replace(/＝/g,'=')
+        .replace(/，|。|、|\n/g,';')
+        .replace(/\s+/g,' ');
+      let m;
+      // 型1：ax+by<=c（純 ASCII，最穩定）
+      const re1=/(\d+\.?\d*)\s*x\s*\+\s*(\d+\.?\d*)\s*y\s*<=\s*(\d+\.?\d*)/gi;
+      while((m=re1.exec(f))!==null){
+        const a=parseFloat(m[1]),b=parseFloat(m[2]),c=parseFloat(m[3]);
+        if(c>0&&!gcons.find(e=>Math.abs(e.a-a)<0.01&&Math.abs(e.b-b)<0.01&&Math.abs(e.c-c)<0.01))
+          gcons.push({a,b,c,label:a+'x+'+b+'y≤'+c});
+      }
+      // 型2：ax+by=c（等號也當 <=）
+      const re1b=/(\d+\.?\d*)\s*x\s*\+\s*(\d+\.?\d*)\s*y\s*=\s*(\d+\.?\d*)/gi;
+      while((m=re1b.exec(f))!==null){
+        const a=parseFloat(m[1]),b=parseFloat(m[2]),c=parseFloat(m[3]);
+        if(c>0&&!gcons.find(e=>Math.abs(e.a-a)<0.01&&Math.abs(e.b-b)<0.01&&Math.abs(e.c-c)<0.01))
+          gcons.push({a,b,c,label:a+'x+'+b+'y≤'+c});
+      }
+      // 型3：x<=c
+      const re2=/(^|[^a-zA-Z])x\s*<=\s*(\d+\.?\d*)/gi;
+      while((m=re2.exec(f))!==null){
+        const c=parseFloat(m[2]);
+        if(c>0&&!gcons.find(e=>e.a===1&&e.b===0&&Math.abs(e.c-c)<0.01))
+          gcons.push({a:1,b:0,c,label:'x≤'+c});
+      }
+      // 型4：y<=c
+      const re3=/(^|[^a-zA-Z])y\s*<=\s*(\d+\.?\d*)/gi;
+      while((m=re3.exec(f))!==null){
+        const c=parseFloat(m[2]);
+        if(c>0&&!gcons.find(e=>e.a===0&&e.b===1&&Math.abs(e.c-c)<0.01))
+          gcons.push({a:0,b:1,c,label:'y≤'+c});
+      }
+    }
+
+    // ── 目標函數係數（加強版）──
+    let objCx=0,objCy=0;
+    {
+      const allT=phases.map(p=>(p.formula||'')+' '+(p.title||'')).join(' ')+(ans||'');
+      const allTn=allT.replace(/＋/g,'+').replace(/＝/g,'=');
+      // P= 或 Z= 開頭
+      const pm=allTn.match(/[PZpz]\s*=\s*(\d+\.?\d*)\s*x\s*\+\s*(\d+\.?\d*)\s*y/i);
+      if(pm){objCx=parseFloat(pm[1]);objCy=parseFloat(pm[2]);}
+      // 備援：「最大化 ax+by」
+      if(!objCx&&!objCy){
+        const pm2=allTn.match(/最大[化]?\s*(\d+\.?\d*)\s*x\s*\+\s*(\d+\.?\d*)\s*y/i);
+        if(pm2){objCx=parseFloat(pm2[1]);objCy=parseFloat(pm2[2]);}
+      }
+    }
+    if(!gopt&&gverts.length>0){
+      const coeff=objCx>0||objCy>0;
+      let best=null,bestV=-Infinity;
+      gverts.forEach(v=>{
+        const val=coeff?objCx*v.x+objCy*v.y:v.x+v.y;
+        if(val>bestV){bestV=val;best=v;}
+      });
+      gopt=best;
+    }
+
+    // ── 座標軸範圍 ──
+    let xMax=1,yMax=1;
+    // 層1：用頂點
+    gverts.forEach(v=>{xMax=Math.max(xMax,v.x);yMax=Math.max(yMax,v.y);});
+    // 層2：gcons 截距
+    if(xMax<=1&&gcons.length>0){
+      gcons.forEach(c=>{
+        if(c.a>0)xMax=Math.max(xMax,c.c/c.a);
+        if(c.b>0)yMax=Math.max(yMax,c.c/c.b);
+      });
+    }
+    // 層3：從 answer 文字萃取分數或整數（例："40/7噸...90/7噸" → 5.7, 12.9）
+    if(xMax<=1){
+      const numSrc=(ans||'')+(phases.map(p=>p.formula||'').join(';'));
+      // 抓 a/b 分數形式
+      const fracRe=/(\d+)\/(\d+)/g;
+      let fm;const nums=[];
+      while((fm=fracRe.exec(numSrc))!==null){
+        const v=parseFloat(fm[1])/parseFloat(fm[2]);
+        if(v>0&&v<1000)nums.push(v);
+      }
+      // 抓整數（>1的）
+      const intRe=/\b(\d{1,4})\b/g;
+      while((fm=intRe.exec(numSrc))!==null){
+        const v=parseFloat(fm[1]);
+        if(v>1&&v<1000)nums.push(v);
+      }
+      if(nums.length>=2){
+        nums.sort((a,b)=>b-a);
+        xMax=Math.max(xMax,nums[0]);
+        yMax=Math.max(yMax,nums[1]||nums[0]);
+      } else if(nums.length===1){
+        xMax=Math.max(xMax,nums[0]);
+        yMax=Math.max(yMax,nums[0]);
+      }
+    }
+    xMax=Math.ceil(xMax*1.3);yMax=Math.ceil(yMax*1.3);
+    if(xMax<5)xMax=5;if(yMax<5)yMax=5;
+
+    // ── 整齊刻度（1/2/4/5/10 的倍數）──
+    function niceStep(range,maxTicks){
+      const raw=range/maxTicks;
+      const mag=Math.pow(10,Math.floor(Math.log10(raw)));
+      const frac=raw/mag;
+      let step=frac<1.5?1:frac<3?2:frac<7?5:10;
+      return step*mag;
+    }
+
+    const cColors=[blue,red,amber,purple,'#1D9E75'];
+
+    // ── 座標函數：傳入 canvas 尺寸，回傳像素 ──
+    function mkAx(W,H){
+      // 左邊留給 y 刻度，底部留給 x 刻度
+      const OX=52,OY=H-42,AW=W-OX-16,AH=OY-24;
+      const sx=AW/xMax,sy=AH/yMax;
+      return {OX,OY,AW,AH,sx,sy};
+    }
+
+    // ── 把約束線裁剪到 canvas 範圍 ──
+    function clipLine(ax,c){
+      const {OX,OY,AW,AH,sx,sy}=ax;
+      // 在 x,y 座標空間內找交點
+      const pts=[];
+      if(c.b!==0){
+        // 和 x=0 的交點
+        const y0=c.c/c.b; if(y0>=0&&y0<=yMax) pts.push({x:0,y:y0});
+        // 和 x=xMax 的交點
+        const yX=(c.c-c.a*xMax)/c.b; if(yX>=0&&yX<=yMax) pts.push({x:xMax,y:yX});
+      }
+      if(c.a!==0){
+        // 和 y=0 的交點
+        const x0=c.c/c.a; if(x0>=0&&x0<=xMax) pts.push({x:x0,y:0});
+        // 和 y=yMax 的交點
+        const xY=(c.c-c.b*yMax)/c.a; if(xY>=0&&xY<=xMax) pts.push({x:xY,y:yMax});
+      }
+      if(pts.length<2) return null;
+      return [
+        {px:OX+pts[0].x*sx, py:OY-pts[0].y*sy},
+        {px:OX+pts[1].x*sx, py:OY-pts[1].y*sy}
+      ];
+    }
+
+    function drawGrid(ctx,W,H,ax){
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const {OX,OY,AW,AH,sx,sy}=ax;
+      const xSt=niceStep(xMax,7),ySt=niceStep(yMax,7);
+      ctx.strokeStyle='rgba(55,138,221,0.1)';ctx.lineWidth=0.5;
+      for(let x=0;x<=xMax;x+=xSt){ctx.beginPath();ctx.moveTo(OX+x*sx,OY-AH-4);ctx.lineTo(OX+x*sx,OY+4);ctx.stroke();}
+      for(let y=0;y<=yMax;y+=ySt){ctx.beginPath();ctx.moveTo(OX-4,OY-y*sy);ctx.lineTo(OX+AW+4,OY-y*sy);ctx.stroke();}
+      arrowX(ctx,OX,OY,OX+AW+14,OY,'#64748B',1.5);
+      arrowX(ctx,OX,OY,OX,OY-AH-14,'#64748B',1.5);
+      LX(ctx,W,H,'x',OX+AW+20,OY,'#64748B',11,true);
+      LX(ctx,W,H,'y',OX,OY-AH-20,'#64748B',11,true);
+      LX(ctx,W,H,'O',OX-14,OY+12,'#64748B',11);
+      ctx.fillStyle='#94A3B8';ctx.font='11px system-ui,sans-serif';
+      ctx.textAlign='center';ctx.textBaseline='top';
+      for(let x=xSt;x<=xMax;x+=xSt) ctx.fillText(x,OX+x*sx,OY+5);
+      ctx.textAlign='right';ctx.textBaseline='middle';
+      for(let y=ySt;y<=yMax;y+=ySt) ctx.fillText(y,OX-6,OY-y*sy);
+    }
+    function drawCons(ctx,W,H,ax){
+      const {OX,OY,sx,sy}=ax;
+      gcons.forEach((c,ci)=>{
+        const seg=clipLine(ax,c);
+        if(!seg)return;
+        const col=cColors[ci%cColors.length];
+        ctx.strokeStyle=col;ctx.lineWidth=2;
+        ctx.beginPath();ctx.moveTo(seg[0].px,seg[0].py);ctx.lineTo(seg[1].px,seg[1].py);ctx.stroke();
+        // 標籤：放線段靠近端點的 15% 處（遠離交叉中心）
+        // 選 y 較小（靠上）的那端，再往畫面外推
+        const useEnd=seg[0].py < seg[1].py ? 0 : 1;
+        const otherEnd=1-useEnd;
+        const tx=seg[useEnd].px+(seg[otherEnd].px-seg[useEnd].px)*0.15;
+        const ty=seg[useEnd].py+(seg[otherEnd].py-seg[useEnd].py)*0.15;
+        const lx=Math.max(OX+6,Math.min(W-80,tx+(tx>W/2?-8:8)));
+        const ly=Math.max(16,Math.min(H-20,ty+(ty<H/2?-16:14)));
+        // 大白底標籤
+        const label=c.label||('C'+(ci+1));
+        ctx.font='600 11px \'Noto Sans TC\',system-ui,sans-serif';
+        const tw=ctx.measureText(label).width+14;
+        const th=18;
+        ctx.fillStyle='rgba(255,255,255,0.96)';
+        ctx.strokeStyle=col;ctx.lineWidth=0.8;
+        ctx.beginPath();ctx.roundRect(lx-tw/2,ly-th/2,tw,th,4);ctx.fill();ctx.stroke();
+        ctx.fillStyle=col;ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(label,lx,ly);
+      });
+    }
+    function drawRegion(ctx,ax){
+      const {OX,OY,sx,sy}=ax;
+      if(gverts.length<3)return;
+      ctx.fillStyle='rgba(55,138,221,0.13)';
+      ctx.strokeStyle='rgba(55,138,221,0.35)';ctx.lineWidth=1.2;
+      ctx.beginPath();
+      gverts.forEach((v,vi)=>{
+        vi===0?ctx.moveTo(OX+v.x*sx,OY-v.y*sy):ctx.lineTo(OX+v.x*sx,OY-v.y*sy);
+      });
+      ctx.closePath();ctx.fill();ctx.stroke();
+    }
+    function drawVerts(ctx,W,H,ax,showOpt){
+      const {OX,OY,sx,sy}=ax;
+      const vColors=[purple,amber,'#A32D2D','#1D9E75',blue];
+      gverts.forEach((v,vi)=>{
+        const px=OX+v.x*sx,py=OY-v.y*sy;
+        const isOpt=showOpt&&gopt&&Math.abs(v.x-gopt.x)<0.01&&Math.abs(v.y-gopt.y)<0.01;
+        const vc=isOpt?green:vColors[vi%vColors.length];
+        ctx.fillStyle=vc;
+        ctx.beginPath();ctx.arc(px,py,isOpt?7:4.5,0,Math.PI*2);ctx.fill();
+        // 標籤偏移：遠離右上角（infoBox 區域），優先往左下偏移
+        const goLeft=px>W*0.6;
+        const goDown=py<H*0.4;
+        const lx=Math.max(32,Math.min(W-60,px+(goLeft?-58:12)));
+        const ly=Math.max(12,Math.min(H-26,py+(goDown?16:-18)));
+        LX(ctx,W,H,'('+v.x+','+v.y+')',lx,ly,vc,12,true);
+      });
+    }
+    // 右上角文字框（不遮約束線）
+    function infoBox(ctx,W,H,lines,col){
+      const size=11,lh=size*1.7,pad=9;
+      ctx.font='500 '+size+'px \'Noto Sans TC\',system-ui,sans-serif';
+      let maxW=0;
+      lines.forEach(l=>{const tw=ctx.measureText(String(l)).width;if(tw>maxW)maxW=tw;});
+      const bw=Math.max(maxW+pad*2, 80), bh=lines.length*lh+pad;
+      // 確保不超出右邊界
+      const bx=Math.max(4, W-bw-8), by=8;
+      ctx.fillStyle='rgba(255,255,255,0.93)';
+      ctx.strokeStyle=col||'#B5D4F4';ctx.lineWidth=0.8;
+      ctx.beginPath();ctx.roundRect(bx,by,bw,bh,5);ctx.fill();ctx.stroke();
+      lines.forEach((l,i)=>{
+        ctx.fillStyle=i===0?col:'#475569';
+        ctx.font=(i===0?'600':'400')+' '+size+'px \'Noto Sans TC\',system-ui,sans-serif';
+        ctx.textAlign='left';ctx.textBaseline='middle';
+        ctx.fillText(String(l),bx+pad,by+pad/2+i*lh+lh/2);
+      });
+    }
+
+    // ── 安全文字框：固定左下角，寬度自動撐開 ──
+    function safeBox(ctx,W,H,lines,borderCol){
+      const size=11,lh=size*1.7,padX=11,padY=8;
+      ctx.font='500 '+size+'px \'Noto Sans TC\',system-ui,sans-serif';
+      let maxW=0;
+      lines.forEach(l=>{
+        ctx.font=(lines.indexOf(l)===0?'600':'400')+' '+size+'px \'Noto Sans TC\',system-ui,sans-serif';
+        const tw=ctx.measureText(String(l)).width;
+        if(tw>maxW)maxW=tw;
+      });
+      const bw=maxW+padX*2;
+      const bh=lines.length*lh+padY*2;
+      const bx=8, by=Math.max(8,H-bh-8);
+      ctx.fillStyle='rgba(255,255,255,0.96)';
+      ctx.strokeStyle=borderCol||'#B5D4F4';ctx.lineWidth=0.9;
+      ctx.beginPath();ctx.roundRect(bx,by,bw,bh,5);ctx.fill();ctx.stroke();
+      lines.forEach((l,i)=>{
+        ctx.fillStyle=i===0?borderCol:'#334155';
+        ctx.font=(i===0?'600':'400')+' '+size+'px \'Noto Sans TC\',system-ui,sans-serif';
+        ctx.textAlign='left';ctx.textBaseline='middle';
+        ctx.fillText(String(l),bx+padX,by+padY+i*lh+lh/2);
+      });
+    }
+
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      const ax=mkAx(W,H);
+      const {OX,OY,sx,sy}=ax;
+      drawGrid(ctx,W,H,ax);
+
+      if(pi===0){
+        // step 0：已知初始條件，不畫約束線，只列出條件
+        const objLabel=objCx>0||objCy>0
+          ?['目標函數：','P = '+objCx+'x + '+objCy+'y','→ 求最大值']
+          :['目標：求最大產量'];
+        infoBox(ctx,W,H,objLabel,blue);
+        // 限制條件：從已解析的 gcons 取 label，最可靠
+        const condLines=gcons.length>0
+          ?['限制條件：',...gcons.map(c=>c.label).filter(Boolean),'x ≥ 0, y ≥ 0']
+          :['限制條件：','x ≥ 0, y ≥ 0'];
+        safeBox(ctx,W,H,condLines,blue);
+        ctx.fillStyle='rgba(55,138,221,0.10)';
+        ctx.beginPath();ctx.roundRect(OX,OY-ax.AH,ax.AW,ax.AH,4);ctx.fill();
+        ctx.fillStyle='#378ADD';ctx.font='600 13px \'Noto Sans TC\',system-ui,sans-serif';
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('確認題目初始條件',OX+ax.AW/2,OY-ax.AH/2);
+      }
+      else if(pi===1){
+        // step 1：畫約束線
+        drawCons(ctx,W,H,ax);
+        infoBox(ctx,W,H,['畫出限制線','每條線代表一個限制式'],blue);
+        safeBox(ctx,W,H,['限制線：',...gcons.map(c=>c.label).filter(Boolean).slice(0,4)],blue);
+      }
+      else if(pi===2){
+        // step 2：可行區域 + 頂點
+        drawRegion(ctx,ax);
+        drawCons(ctx,W,H,ax);
+        drawVerts(ctx,W,H,ax,false);
+        infoBox(ctx,W,H,['可行區域（藍色陰影）','交點為頂點候選'],blue);
+        const vLines=['頂點列表：',...gverts.map(v=>'('+v.x+', '+v.y+')')];
+        safeBox(ctx,W,H,vLines.slice(0,6),purple);
+      }
+      else{
+        // step 3：最優解
+        drawRegion(ctx,ax);
+        drawCons(ctx,W,H,ax);
+        drawVerts(ctx,W,H,ax,true);
+        if(gopt){
+          const opx=OX+gopt.x*sx,opy=OY-gopt.y*sy;
+          ctx.fillStyle='rgba(29,158,117,0.15)';
+          ctx.beginPath();ctx.arc(opx,opy,28*e,0,Math.PI*2);ctx.fill();
+          ctx.strokeStyle=green;ctx.lineWidth=2.5;
+          ctx.beginPath();ctx.arc(opx,opy,11*e,0,Math.PI*2);ctx.stroke();
+          const pval=(objCx>0||objCy>0)
+            ?'P = '+objCx+'×'+gopt.x+' + '+objCy+'×'+gopt.y+' = '+(objCx*gopt.x+objCy*gopt.y)
+            :'代入目標函數';
+          infoBox(ctx,W,H,['★ 最優解','x='+gopt.x+'，y='+gopt.y,pval],green);
+        }
+        if(e>0.6&&ans){
+          safeBox(ctx,W,H,['最終答案：',ans],green);
+        }
+      }
+    });
+  }
+
+return phases.map((_,pi)=>(ctx,W,H,e)=>{
+    ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+    const step=phases[pi]||{};
+    const colors=['#0C447C','#854F0B','#085041','#3C3489','#A32D2D','#1D9E75'];
+    const col=colors[pi%colors.length];
+    // 步驟標籤
+    ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(W/2-52,22,104,26,13);ctx.fill();
+    ctx.fillStyle='#fff';ctx.font='500 11px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+    ctx.fillText('步驟 '+(pi+1)+' / '+PN,W/2,35);
+    // 標題（自動換行，最多兩行）
+    {
+      const titleText=step.title||'';
+      ctx.font='700 15px \'Noto Sans TC\',system-ui,sans-serif';
+      ctx.fillStyle='#1E293B';ctx.textAlign='center';ctx.textBaseline='middle';
+      const maxTW=W-48;
+      if(ctx.measureText(titleText).width<=maxTW){
+        ctx.fillText(titleText,W/2,80);
+      } else {
+        // 折成兩行
+        let cut=Math.floor(titleText.length/2);
+        while(cut>0&&ctx.measureText(titleText.slice(0,cut)).width>maxTW) cut--;
+        ctx.fillText(titleText.slice(0,cut),W/2,70);
+        ctx.fillText(titleText.slice(cut),W/2,88);
+      }
+    }
+    // 分隔線
+    ctx.strokeStyle='rgba(55,138,221,0.2)';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(50,100);ctx.lineTo(W-50,100);ctx.stroke();
+    // 公式（支援自動換行，清除 markdown）
+    if(step.formula){
+      // 清除 Gemini 的 markdown 語法
+      step.formula=step.formula
+        .replace(/\*\*([^*]+)\*\*/g,'$1')
+        .replace(/\*([^*]+)\*/g,'$1')
+        .replace(/`([^`]+)`/g,'$1')
+        .replace(/#{1,6}\s*/g,'');
+      // 先切分段落（\n 或 ；），再對每段做自動換行
+      function wrapLine(ctx,text,maxW,fontSize){
+        ctx.font='400 '+fontSize+'px \'Noto Sans TC\',system-ui,sans-serif';
+        const words=text.split('');
+        let line='',res=[];
+        for(const ch of words){
+          const test=line+ch;
+          if(ctx.measureText(test).width>maxW&&line){res.push(line);line=ch;}
+          else line=test;
+        }
+        if(line)res.push(line);
+        return res.length?res:[text];
+      }
+      const rawLines=step.formula.split(/\\n|\n|；/).filter(l=>l.trim());
+      const maxW=W-60;
+      // 展開所有折行
+      let allLines=[];
+      rawLines.forEach((l,i)=>{
+        // 行數多時自動縮小字體（最小 11px）
+        const fontSize=rawLines.length>4?12:14;
+        const wrapped=wrapLine(ctx,l,maxW,fontSize);
+        wrapped.forEach((wl,wi)=>allLines.push({text:wl,isFirst:wi===0,groupIdx:i,totalGroups:rawLines.length}));
+      });
+      allLines.forEach((item,li)=>{
+        const ty=118+li*32;if(ty>H-50)return;
+        const isLastGroup=item.groupIdx===item.totalGroups-1;
+        const fs=rawLines.length>4?12:14;
+        ctx.font=(item.groupIdx===0&&item.isFirst?'600':'400')+' '+fs+'px \'Noto Sans TC\',system-ui,sans-serif';
+        const tw=ctx.measureText(item.text).width+20;
+        const fx=Math.max(20,W/2-tw/2);
+        if(item.isFirst){
+          ctx.fillStyle=item.groupIdx===0?'rgba(55,138,221,0.1)':'rgba(0,0,0,0.03)';
+          ctx.beginPath();ctx.roundRect(fx,ty-13,Math.min(tw,W-40),26,5);ctx.fill();
+        }
+        ctx.fillStyle=item.groupIdx===0?col:isLastGroup?'#085041':'#64748B';
+        ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(item.text,W/2,ty);
+      });
+    }
+    if(pi===PN-1&&e>0.5)ansBox(ctx,W,H,ans);
+  });
+}
+
+// ── Add result card ───────────────────────────────────
+const cardOrigQuery={};
+function retryExplain(cardId){
+  const inp=document.getElementById('inp');
+  if(inp){
+    inp.value=cardOrigQuery[cardId]||'';
+    autoH(inp);
+    inp.focus();
+    inp.scrollIntoView({behavior:'smooth',block:'center'});
+  }
+}
+function addResultCard(q,phaseFns,exps,cardId,origQuery){
+  const chat=document.getElementById('chat');
+  const PN=phaseFns.length;
+  cardPhasesList[cardId]=phaseFns;cardPhases[cardId]=0;
+  cardOrigQuery[cardId]=origQuery||q||'';
+  const colors=['bl','am','gr'];
+  // 整理老師說明資料，過濾掉標題與內容都空白的項目，避免顯示異常
+  let safeExps=[];
+  try{
+    safeExps=(Array.isArray(exps)?exps:[]).filter(ex=>ex&&((ex.title&&String(ex.title).trim())||(ex.body&&String(ex.body).trim())));
+  }catch(e){safeExps=[];}
+  function rowColor(i){if(i===safeExps.length-1)return 'gr';return colors[i%3];}
+  let exHtml='';
+  try{
+    exHtml=safeExps.map((ex,i)=>{
+      const col=rowColor(i),phase=i+1;
+      const title=escapeHtml(ex.title||'說明');
+      // 清除 Gemini 輸出的 markdown 符號，再換行
+      const rawBody=(ex.body||'')
+        .replace(/\*\*([^*]+)\*\*/g,'$1')   // **粗體** → 純文字
+        .replace(/\*([^*]+)\*/g,'$1')         // *斜體* → 純文字
+        .replace(/`([^`]+)`/g,'$1')            // `code` → 純文字
+        .replace(/#{1,6}\s*/g,'')             // # 標題符號
+        .trim();
+      const body=escapeHtml(rawBody).replace(/\n/g,'<br>');
+      return '<div class="erow '+col+'" id="row_'+cardId+'_'+i+'">'+'<div class="erow-icon">'+(i+1)+'</div>'+'<div class="erow-content">'+'<div class="et">'+title+'<span class="step-tag">步驟 '+phase+'</span></div>'+'<div class="ed">'+body+'</div>'+'</div></div>';
+    }).join('');
+  }catch(e){exHtml='';}
+  // 萬一說明真的無法產生，顯示明確提示，避免同學以為系統壞掉
+  if(!exHtml.trim()){
+    exHtml='<div class="erow-fallback">'
+      +'<div class="erow-fallback-txt">這題的文字說明暫時沒有顯示出來，不是壞掉喔！左側的解題圖示一樣可以正常操作，你可以點下面的按鈕重新送出題目，再產生一次說明。</div>'
+      +'<button class="erow-retry-btn" onclick="retryExplain(\''+cardId+'\')">🔄 重新送出題目</button>'
+      +'</div>';
+  }
+  const safeQ=escapeHtml(q);
+  const dotsHtml=phaseFns.map((_,i)=>'<button class="dot'+(i===0?' on':'')+'" onclick="jumpTo(\''+cardId+'\','+i+')" aria-label="步驟'+(i+1)+'"></button>').join('');
+  const wrap=document.createElement('div');wrap.className='msg result-msg';
+  wrap.innerHTML='<div class="msg-av" style="margin-top:2px">AI</div>'
+    +'<div class="result-wrap">'
+    // 題目 bar 跨兩欄
+    +'<div class="q-bar">'
+    +'<span class="q-num">題目</span><span class="q-txt">'+safeQ+'</span></div>'
+    // 左欄：圖形
+    +'<div class="result-card">'
+    +'<canvas id="cv_'+cardId+'" width="560" height="380" style="display:block;width:100%;height:auto;background:#F0F5FB"></canvas>'
+    +'<div class="res-ctrl">'
+    +'<button id="bp_'+cardId+'" onclick="cardPrev(\''+cardId+'\')" disabled>← 上一步</button>'
+    +'<div class="ctrl-dots" id="dots_'+cardId+'">'+dotsHtml+'</div>'
+    +'<button id="bn_'+cardId+'" onclick="cardNext(\''+cardId+'\')" class="pr">下一步 →</button>'
+    +'</div></div>'
+    // 右欄：說明
+    +'<div class="explain-card">'
+    +'<div class="explain-hdr"><div class="ex-av">AI</div><div class="ex-name">老師說明</div></div>'
+    +'<div class="explain-body" id="ex_'+cardId+'">'+exHtml+'</div>'
+    +'</div>'
+    +'</div>';
+  chat.appendChild(wrap);chat.scrollTop=chat.scrollHeight;
+  setTimeout(()=>{const cv=document.getElementById('cv_'+cardId);if(cv&&phaseFns[0]){const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);phaseFns[0](ctx,cv.width,cv.height,1);}syncUI(cardId);},60);
+}
+
+// ── System prompt ─────────────────────────────────────
+const SYS='你是育達補習班AI老師，只回傳純JSON不加任何說明、不使用markdown（禁止用**、*、`、#）：\n{"question":"題目20字","graphType":"類型","graphParams":{},"explanations":[{"title":"標題","body":"詳細說明文字，至少2句話"}],"phases":[{"title":"步名","formula":"算式"}],"answer":"答案"}\ngraphType選擇：三角形→triangle；二次函數→quadratic；sin/cos→sincos；畢氏→pythagorean；RLC→rlc；v-t圖→vt；彈簧→spring；齒輪→gear；皮帶輪→pulley；圓→circle；圓周運動／向心力／離心力／彎道最高速限→circular_motion；向量→vector；一次函數→linear；線性規劃（最大化/最小化+不等式約束）→linear_programming；直流電路→dc_circuit；功率三角→power；摩擦盤→friction_disc；其他→text。\n【triangle格式】graphParams:{AB,AC,BC,angleA,angleB,angleC,cosA,sinA}，填入已知的邊長（數字）和角度（如"60°"），未知的不填。\n【circle格式】graphParams:{h,k,r}為原圓圓心(h,k)半徑r；若題目要求畫出新圓，同時填入nh,nk,nr為新圓參數；phases[0]=原圓資訊,phases[1]=新圓圓心半徑,phases[2]=新圓標準式,phases[3]=展開一般式。\n【circular_motion格式】graphParams:{R,mu,g}（R是彎道半徑公尺數值，禁止用circle類型）。\n【線性規劃嚴格格式】graphParams必須為{}；phases必須剛好4個；phases[0].formula必須包含所有不等式用分號分隔（例："15x+12y<=240;75x+25y<=750;x>=0,y>=0"）；phases[1].formula寫目標函數（例："P=25x+12y"）；phases[2].formula寫頂點列表（例："(0,0);(0,20);(10,0);(40/7,90/7)"）；phases[3].formula寫最優解計算（例："P(40/7,90/7)=2080/7"）；answer寫最終結果文字。禁止把計算結果放在phases[0]。\nphases和explanations數量必須相等（均為4個）。計算後驗算。friction_disc：graphParams:{Ro,Ri,mu,T,Ravg,F}，T=μ×F×Ravg單面。【單位嚴格規定】Ro、Ri、Ravg必須一律用「毫米mm」的數值；T必須用「牛頓-公分N-cm」的數值；F維持牛頓(N)數值。';
+
+// ── Send ──────────────────────────────────────────────
+async function send(){
+  const inp=document.getElementById('inp');const q=inp.value.trim();
+  if(!q&&!pendingImg)return;
+  inp.value='';inp.style.height='40px';
+  document.getElementById('sendBtn').disabled=true;
+  const dispQ=q||(pendingImg?'（圖片題目）':'');
+  if(pendingImg){
+    const d=document.createElement('div');d.className='msg user';
+    d.innerHTML='<div class="bub"><img src="data:image/jpeg;base64,'+pendingImg+'" style="max-width:160px;border-radius:6px;display:block;margin-bottom:4px">'+escapeHtml(q||'請解這道題')+'</div>';
+    document.getElementById('chat').appendChild(d);document.getElementById('chat').scrollTop=99999;
+  }else{addMsg('user',q);}
+  showTyping();
+
+  // 組合 prompt
+  let fullPrompt=SYS+'\n\n題目：'+q;
+  if(pendingImg) fullPrompt=SYS+'\n\n請仔細看圖片中的題目，完整解題。補充說明：'+(q||'請解這道題');
+
+  try{
+    const payload={studentId:studentId, prompt:fullPrompt};
+    if(pendingImg) payload.image=pendingImg;
+    const res=await fetch(WORKERS_URL,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify(payload)
+    });
+    if(!res.ok){
+      removeTyping();
+      let statusMsg='';
+      if(res.status===503||res.status===502) statusMsg='AI 伺服器暫時忙碌中，請等待 10 秒後再重新送出題目。';
+      else if(res.status===429) statusMsg='使用太頻繁，請等待約 30 秒後再試。';
+      else if(res.status===401||res.status===403) statusMsg='驗證失敗，請重新整理頁面後再試。';
+      else statusMsg='伺服器暫時無法使用（'+res.status+'），請稍後再試。';
+      addMsg('ai',statusMsg);
+      document.getElementById('sendBtn').disabled=false;
+      return;
+    }
+    const data=await res.json();
+    if(data.error){
+      removeTyping();
+      const errCode=data.error?.code||0;
+      const errMsg=typeof data.error==='object'?(data.error.message||''):data.error;
+      const errStatus=data.error?.status||'';
+      let msg='';
+      if(errCode===503||errMsg.includes('high demand')||errMsg.includes('UNAVAILABLE')) msg='AI 伺服器目前流量較大，請稍等幾秒後再試一次。';
+      else if(errCode===429||errMsg.includes('quota')||errMsg.includes('exceeded')||errStatus==='RESOURCE_EXHAUSTED') msg='使用次數暫時達到上限（每分鐘最多20次），請等待約30秒後再試。';
+      else if(errCode===400) msg='題目格式有問題，請換個方式輸入後再試。';
+      else if(errCode===401||errCode===403) msg='驗證失敗，請重新整理頁面後再試。';
+      else msg='AI 服務暫時無法使用，請稍後再試。';
+      addMsg('ai',msg);
+      document.getElementById('sendBtn').disabled=false;
+      return;
+    }
+    // Workers 使用 Gemini API，格式為 data.candidates[0].content.parts[0].text
+    let raw='{}';
+    if(data.candidates?.[0]?.content?.parts?.[0]?.text){
+      raw=data.candidates[0].content.parts[0].text;
+    } else if(data.candidates?.[0]?.content?.parts){
+      raw=data.candidates[0].content.parts.map(p=>p.text||'').join('');
+    } else if(typeof data.text==='string'){
+      raw=data.text;
+    } else if(typeof data.result==='string'){
+      raw=data.result;
+    } else {
+      const dataPreview=JSON.stringify(data).slice(0,400);
+      removeTyping();
+      addMsg('ai','⚠️ AI 回傳格式無法解析，請重新送出題目。<br><code style="font-size:11px;word-break:break-all;background:#F7F9FC;padding:6px;border-radius:6px;display:block;margin-top:6px">'+escapeHtml(dataPreview)+'</code>');
+      document.getElementById('sendBtn').disabled=false;
+      return;
+    }
+    // 清理 markdown 包裹
+    raw=raw.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
+    raw=raw.replace(/^```\s*/,'').replace(/\s*```$/,'').trim();
+    // 找出 JSON 主體
+    const first=raw.indexOf('{'),last=raw.lastIndexOf('}');
+    if(first!==-1&&last!==-1) raw=raw.slice(first,last+1);
+    // ── 智慧 JSON 修復函數 ───────────────────────────
+    function tryRepairJson(s){
+      // 策略1：用狀態機找到最後一個完整物件
+      try{
+        let depth=0,inStr=false,esc=false,lastComplete=-1;
+        for(let i=0;i<s.length;i++){
+          const c=s[i];
+          if(esc){esc=false;continue;}
+          if(c==='\\'){esc=true;continue;}
+          if(c==='"'&&!esc){inStr=!inStr;continue;}
+          if(inStr)continue;
+          if(c==='{')depth++;
+          else if(c==='}'){depth--;if(depth===0)lastComplete=i;}
+        }
+        if(lastComplete>0){const t=s.slice(0,lastComplete+1);return JSON.parse(t);}
+      }catch(e){}
+      // 策略2：截斷到最後一個完整的字串值後補括號
+      try{
+        // 找最後一個完整的 "key":"value" 配對後截斷
+        const lastComma=s.lastIndexOf(',"');
+        const lastColon=s.lastIndexOf('":');
+        const cutAt=Math.max(lastComma,s.lastIndexOf('"}')); 
+        if(cutAt>100){
+          let fixed=s.slice(0,cutAt+2);
+          // 清除最後不完整的 key
+          fixed=fixed.replace(/,"[^"]*$/,'');
+          // 補閉合符號（由內而外）
+          const stk=[];
+          let inS=false,es=false;
+          for(const c of fixed){
+            if(es){es=false;continue;}
+            if(c==='\\'){es=true;continue;}
+            if(c==='"'){inS=!inS;continue;}
+            if(inS)continue;
+            if(c==='{'||c==='[')stk.push(c);
+            else if(c==='}'||c===']')stk.pop();
+          }
+          for(let i=stk.length-1;i>=0;i--) fixed+=(stk[i]==='{'?'}':']');
+          return JSON.parse(fixed);
+        }
+      }catch(e){}
+      return null;
+    }
+    function extractPartialJson(s){
+      // 最後手段：用正規表示式硬挖關鍵欄位
+      try{
+        const qm=s.match(/"question"\s*:\s*"([^"]+)"/);
+        const gm=s.match(/"graphType"\s*:\s*"([^"]+)"/);
+        const am=s.match(/"answer"\s*:\s*"([^"]+)"/);
+        if(qm){return {question:qm[1],graphType:gm?gm[1]:'text',graphParams:{},phases:[{title:'解題過程',formula:am?am[1]:''}],answer:am?am[1]:'',explanations:[]};}
+      }catch(e){}
+      return null;
+    }
+
+    let obj;
+    try{
+      obj=JSON.parse(raw);
+      console.log('✅ JSON 解析成功，graphType=',obj.graphType,'phases=',obj.phases?.length,'explanations=',obj.explanations?.length);
+    }catch(e){
+      obj=tryRepairJson(raw)||extractPartialJson(raw);
+      if(!obj){
+        removeTyping();
+        // 顯示原始回傳，方便除錯
+        const preview=raw.length>300?raw.slice(0,300)+'…':raw;
+        addMsg('ai','⚠️ JSON 解析失敗（格式：'+detectedFmt+'）<br><br><code style="font-size:11px;word-break:break-all;background:#F7F9FC;padding:6px;border-radius:6px;display:block">'+escapeHtml(preview)+'</code>');
+        document.getElementById('sendBtn').disabled=false;
+        return;
+      }
+    }
+    // 關鍵欄位截斷補救
+    if(!Array.isArray(obj.phases)||obj.phases.length===0)
+      obj.phases=[{title:'解題過程',formula:obj.answer||''}];
+    if(!Array.isArray(obj.explanations)||obj.explanations.length===0){
+      // explanations 被截斷時，從 phases 自動重建有意義的說明
+      obj.explanations=obj.phases.map((p,i)=>{
+        const formulas=(p.formula||'').split(/\\n|；|;/).filter(l=>l.trim());
+        const body=formulas.length>1
+          ?'計算步驟：\n'+formulas.join('\n')
+          :p.formula?('計算：'+p.formula):'此步驟請對照左側圖形。';
+        return {title:p.title||('步驟 '+(i+1)),body};
+      });
+    }
+    if(obj.graphType&&obj.graphType!=='text'&&(!obj.graphParams||typeof obj.graphParams!=='object'))
+      obj.graphType='text';
+    removeTyping();clearImg();
+    const cardId='c'+Date.now();
+    // 確保老師說明數量至少與計算步驟數量一致，避免AI回傳不完整時右側說明只剩一兩步
+    const phasesArr=Array.isArray(obj.phases)?obj.phases:[];
+    let explanationsArr=Array.isArray(obj.explanations)?obj.explanations.slice():[];
+    for(let i=explanationsArr.length;i<phasesArr.length;i++){
+      const ph=phasesArr[i]||{};
+      explanationsArr.push({
+        title: ph.title||('步驟 '+(i+1)),
+        body: ph.formula?('這一步的計算：'+ph.formula):'這個步驟的詳細說明暫時沒有顯示出來，可以參考左側圖示的計算過程。'
+      });
+    }
+    addResultCard(obj.question||dispQ,buildPhaseFns(obj),explanationsArr,cardId,dispQ);
+  }catch(err){
+    removeTyping();
+    let msg='發生錯誤，請稍後再試。';
+    if(err.message.includes('Failed to fetch')||err.message.includes('NetworkError')) msg='網路連線失敗，請確認網路後再試。';
+    else if(err.message.includes('timeout')||err.message.includes('Timeout')) msg='連線逾時，伺服器回應太慢，請稍後再試。';
+    else if(err.message.includes('503')||err.message.includes('UNAVAILABLE')) msg='AI 伺服器目前流量較大，請等待幾秒後再試一次。';
+    else if(err.message.includes('401')||err.message.includes('403')) msg='身分驗證失敗，請重新登入。';
+    addMsg('ai',msg);
+  }  document.getElementById('sendBtn').disabled=false;
+}
+</script>
+</body>
+</html>
