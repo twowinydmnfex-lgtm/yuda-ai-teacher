@@ -2119,6 +2119,11 @@ function addResultCard(q,phaseFns,exps,cardId,origQuery){
   try{
     safeExps=(Array.isArray(exps)?exps:[]).filter(ex=>ex&&((ex.title&&String(ex.title).trim())||(ex.body&&String(ex.body).trim())));
   }catch(e){safeExps=[];}
+
+  // 偵測圖片辨識不清：explanations 全部 body 合計字數太少，或只有答案沒說明
+  const totalBodyLen=safeExps.reduce((acc,ex)=>acc+(ex.body||'').replace(/\s/g,'').length,0);
+  const looksUnreadable=safeExps.length===0||(totalBodyLen<30&&safeExps.length<=1);
+
   function rowColor(i){if(i===safeExps.length-1)return 'gr';return colors[i%3];}
   let exHtml='';
   try{
@@ -2136,6 +2141,15 @@ function addResultCard(q,phaseFns,exps,cardId,origQuery){
       return '<div class="erow '+col+'" id="row_'+cardId+'_'+i+'">'+'<div class="erow-icon">'+(i+1)+'</div>'+'<div class="erow-content">'+'<div class="et">'+title+'<span class="step-tag">步驟 '+phase+'</span></div>'+'<div class="ed">'+body+'</div>'+'</div></div>';
     }).join('');
   }catch(e){exHtml='';}
+
+  // 圖片辨識不清時，在老師說明最上方加提示
+  if(looksUnreadable){
+    exHtml='<div class="erow-fallback" style="border-left:3px solid #F59E0B;background:rgba(245,158,11,0.08);padding:12px 14px;border-radius:8px;margin-bottom:8px">'
+      +'<div style="font-size:13px;color:#92400E;font-weight:600;margin-bottom:4px">📷 圖片辨識不完整</div>'
+      +'<div style="font-size:12px;color:#78350F;line-height:1.6">題目圖片可能太模糊、角度傾斜，或文字太小，AI 沒辦法完整讀取。<br>建議：<strong>正面拍攝、光線充足、放大題目</strong>後重新上傳，說明就會完整出現。</div>'
+      +'</div>'+exHtml;
+  }
+
   // 萬一說明真的無法產生，顯示明確提示，避免同學以為系統壞掉
   if(!exHtml.trim()){
     exHtml='<div class="erow-fallback">'
@@ -2170,7 +2184,7 @@ function addResultCard(q,phaseFns,exps,cardId,origQuery){
 }
 
 // ── System prompt ─────────────────────────────────────
-const SYS='你是育達補習班AI老師，只回傳純JSON不加任何說明、不使用markdown（禁止用**、*、`、#）：\n{"question":"題目20字","graphType":"類型","graphParams":{},"explanations":[{"title":"標題","body":"詳細說明文字，至少2句話"}],"phases":[{"title":"步名","formula":"算式或說明"}],"answer":"答案"}\n\n【graphType 完整選擇表】\n數學/機件：triangle；quadratic；sincos；pythagorean；rlc；vt；spring；gear；pulley；circle；circular_motion；vector；linear；linear_programming；dc_circuit；power；friction_disc。\n土木/機械力學→static_force。電機電子/資訊→logic_gate；transistor。商管會計→accounting。\n國文/閱讀測驗（含圖表判讀）→reading_chart。英文閱讀→english_reading；文法/克漏字→english_grammar；翻譯/作文→english_writing。\n化工/商管計算→calculation；非數學圖表判讀→chart_mcq；觀念/名詞解釋→concept_mcq；流程圖→process_flow。\n其他→text。\n\n【static_force 格式 - 靜力學/梁的反力/力矩】\ngraphParams:{beamLen:梁長公尺,loadType:"point或distributed",fy:力kN,dist:距A點距離公尺,reactionA:RA值,reactionB:RB值,angle:斜力角度(無斜力填0)}。\nphases 4個：phases[0]畫自由體圖標外力,phases[1]對A點取力矩求RB,phases[2]由ΣFy=0求RA,phases[3]驗算。explanations同4個。\n\n【logic_gate 格式 - 邏輯閘/真值表】\ngraphParams:{gate:"AND或OR或NOT或NAND或NOR或XOR或XNOR",inputs:["A","B"],expression:"布林表示式"}。\nphases 4個：phases[0]認識閘符號與邏輯運算,phases[1]列出真值表輸入組合,phases[2]逐行計算輸出,phases[3]確認答案。explanations同4個。\n\n【accounting 格式 - 借貸分錄/T字帳】\ngraphParams:{accounts:[{name:"帳戶名",debit:借方金額,credit:貸方金額}],equation:{assets:資產,liabilities:負債,equity:業主權益}}。accounts最多4個。\nphases 4個：phases[0]分析交易本質,phases[1]判斷借貸方向（資產增→借方；負債增→貸方），phases[2]填寫分錄,phases[3]過帳T字帳確認餘額。explanations同4個。\n\n【transistor 格式 - 電晶體特性曲線/工作點】\ngraphParams:{type:"BJT或FET",VCC:電源電壓,RC:集極電阻kΩ,IB:基極電流mA,hFE:電流增益,curves:[{ib:基極電流,ic:集極電流}]}。\nphases 4個：phases[0]認識特性曲線族,phases[1]畫直流負載線（兩端點：飽和點與截止點）,phases[2]找工作點Q（負載線與IB曲線交點）,phases[3]計算VCE與IC。explanations同4個。\n\n【reading_chart 格式 - 閱讀測驗/圖表判讀】\ngraphParams:{chartDesc:"圖表結構（座標軸/象限意義）"}。phases 4個：phases[0]讀懂圖表結構,phases[1]找出人物具體行為（引用原文），phases[2]行為對應座標位置,phases[3]逐一比對選項。禁止直接猜答案。\n\n【english_reading 格式】graphParams:{}。phases 4個：主題/關鍵字,題目定位,關鍵句解析,選項逐一分析。\n【english_grammar 格式】graphParams:{}。phases 4個：辨識題型,文法規則,代入驗證,確認+口訣。\n【english_writing 格式】graphParams:{}。phases 3個：句型分析,詞組示範,完整答案。\n【concept_mcq 格式】graphParams:{}。phases 4個：核心概念,定義說明,選項分析,答案+口訣。\n【chart_mcq 格式】graphParams:{chartDesc:"圖表說明"}。phases 4個：圖表結構,題目問什麼,對應位置,比對選項。\n【calculation 格式】graphParams:{}。phases 4個：已知整理,公式,代入計算,答案+單位。\n【process_flow 格式】graphParams:{steps:["步驟1",...]}，steps最多6個，phases數量=steps數量。\n\n【數學/機件格式（既有）】\ntriangle:{AB,AC,BC,angleA,angleB,angleC}。circle:{h,k,r,nh,nk,nr}。circular_motion:{R,mu,g}。linear_programming:phases剛好4個,phases[0]含不等式,phases[1]目標函數,phases[2]頂點列表,phases[3]最優解。friction_disc:{Ro,Ri,mu,T,Ravg,F}，Ro/Ri/Ravg單位mm，T單位N-cm。\n\nphases和explanations數量必須相等。計算題計算後驗算答案。';
+const SYS='你是育達補習班AI老師，只回傳純JSON不加任何說明、不使用markdown（禁止用**、*、`、#）：\n{"question":"題目20字","graphType":"類型","graphParams":{},"explanations":[{"title":"標題","body":"詳細說明文字，至少2句話"}],"phases":[{"title":"步名","formula":"算式或說明"}],"answer":"答案"}\n\n【graphType 完整選擇表】\n數學/機件：triangle；quadratic；sincos；pythagorean；rlc；vt；spring；gear；pulley；circle；circular_motion；vector；linear；linear_programming；dc_circuit；power；friction_disc。\n土木/機械力學→static_force。電機電子/資訊→logic_gate；transistor。商管會計→accounting。\n國文/閱讀測驗（含圖表判讀）→reading_chart。英文閱讀→english_reading；文法/克漏字→english_grammar；翻譯/作文→english_writing。\n化工/商管計算→calculation；非數學圖表判讀→chart_mcq；觀念/名詞解釋→concept_mcq；流程圖→process_flow。\n其他→text。\n\n【static_force 格式 - 靜力學/梁的反力/力矩】\ngraphParams:{beamLen:梁長公尺,loadType:"point或distributed",fy:力kN,dist:距A點距離公尺,reactionA:RA值,reactionB:RB值,angle:斜力角度(無斜力填0)}。\nphases 4個：phases[0]畫自由體圖標外力,phases[1]對A點取力矩求RB,phases[2]由ΣFy=0求RA,phases[3]驗算。explanations同4個。\n\n【logic_gate 格式 - 邏輯閘/真值表】\ngraphParams:{gate:"AND或OR或NOT或NAND或NOR或XOR或XNOR",inputs:["A","B"],expression:"布林表示式"}。\nphases 4個：phases[0]認識閘符號與邏輯運算,phases[1]列出真值表輸入組合,phases[2]逐行計算輸出,phases[3]確認答案。explanations同4個。\n\n【accounting 格式 - 借貸分錄/T字帳】\ngraphParams:{accounts:[{name:"帳戶名",debit:借方金額,credit:貸方金額}],equation:{assets:資產,liabilities:負債,equity:業主權益}}。accounts最多4個。\nphases 4個：phases[0]分析交易本質,phases[1]判斷借貸方向（資產增→借方；負債增→貸方），phases[2]填寫分錄,phases[3]過帳T字帳確認餘額。explanations同4個。\n\n【transistor 格式 - 電晶體特性曲線/工作點】\ngraphParams:{type:"BJT或FET",VCC:電源電壓,RC:集極電阻kΩ,IB:基極電流mA,hFE:電流增益,curves:[{ib:基極電流,ic:集極電流}]}。\nphases 4個：phases[0]認識特性曲線族,phases[1]畫直流負載線（兩端點：飽和點與截止點）,phases[2]找工作點Q（負載線與IB曲線交點）,phases[3]計算VCE與IC。explanations同4個。\n\n【reading_chart 格式 - 閱讀測驗/圖表判讀】\ngraphParams:{chartDesc:"圖表結構（座標軸/象限意義）"}。phases 4個：phases[0]讀懂圖表結構,phases[1]找出人物具體行為（引用原文），phases[2]行為對應座標位置,phases[3]逐一比對選項。禁止直接猜答案。\n\n【english_reading 格式】graphParams:{}。phases 4個：主題/關鍵字,題目定位,關鍵句解析,選項逐一分析。\n【english_grammar 格式】graphParams:{}。phases 4個：辨識題型,文法規則,代入驗證,確認+口訣。\n【english_writing 格式】graphParams:{}。phases 3個：句型分析,詞組示範,完整答案。\n【concept_mcq 格式】graphParams:{}。phases 4個：核心概念,定義說明,選項分析,答案+口訣。\n【chart_mcq 格式】graphParams:{chartDesc:"圖表說明"}。phases 4個：圖表結構,題目問什麼,對應位置,比對選項。\n【calculation 格式】graphParams:{}。phases 4個：已知整理,公式,代入計算,答案+單位。\n【process_flow 格式】graphParams:{steps:["步驟1",...]}，steps最多6個，phases數量=steps數量。\n\n【數學/機件格式（既有）】\ntriangle:{AB,AC,BC,angleA,angleB,angleC}。circle:{h,k,r,nh,nk,nr}。circular_motion:{R,mu,g}。linear_programming:phases剛好4個,phases[0]含不等式,phases[1]目標函數,phases[2]頂點列表,phases[3]最優解。friction_disc:{Ro,Ri,mu,T,Ravg,F}，Ro/Ri/Ravg單位mm，T單位N-cm。\n\nphases和explanations數量必須相等。計算題計算後驗算答案。\n\n【explanations 鐵律】每一個 explanation 的 body 必須包含完整說明，至少2句話，禁止只寫答案或「計算：(X)」。即使圖片不清晰，也必須根據已辨識的內容給出文法/概念/解題說明。若完全無法辨識題目內容，explanations[0].body 必須說明：「圖片辨識不完整，建議重拍後再試」，並說明正確的拍攝方式。';
 
 // ── Send ──────────────────────────────────────────────
 async function send(){
