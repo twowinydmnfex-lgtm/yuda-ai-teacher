@@ -375,6 +375,17 @@ function buildPhaseFns(obj){
     'dc':'dc_circuit','circuit':'dc_circuit','直流電路':'dc_circuit',
     'power_triangle':'power','功率三角形':'power',
     'friction':'friction_disc','摩擦盤':'friction_disc',
+    // ── 新增：語文/人文/商管科目 ──
+    'reading':'reading_chart','閱讀測驗':'reading_chart','圖表判讀':'reading_chart',
+    'chart_reading':'reading_chart','reading_comprehension':'reading_chart',
+    'english':'english_reading','english_comprehension':'english_reading',
+    'grammar':'english_grammar','cloze':'english_grammar','克漏字':'english_grammar',
+    'english_cloze':'english_grammar','文法':'english_grammar',
+    'writing':'english_writing','composition':'english_writing','翻譯':'english_writing',
+    'concept':'concept_mcq','觀念':'concept_mcq','名詞解釋':'concept_mcq',
+    'chart':'chart_mcq','非數學圖表':'chart_mcq',
+    'calc':'calculation','數值計算':'calculation',
+    'flow':'process_flow','流程圖':'process_flow','process':'process_flow',
   };
   let gtype=(obj.graphType||'text').trim();
   gtype=typeAlias[gtype]||gtype;
@@ -1437,6 +1448,212 @@ function buildPhaseFns(obj){
     });
   }
 
+  // ── 閱讀測驗/圖表判讀 reading_chart ─────────────────────
+  // 適用：國文閱讀測驗含圖表判讀（象限圖、座標圖選擇題）
+  if(gtype==='reading_chart'||gtype==='reading'){
+    const chartDesc=(gp.chartDesc||'圖表判讀');
+    const stepColors=[blue,amber,green,purple];
+    const stepBg=['rgba(12,68,124,0.08)','rgba(133,79,11,0.08)','rgba(8,80,65,0.08)','rgba(60,52,137,0.08)'];
+    // 嘗試從 chartDesc 解析象限資訊
+    const hasQuadrant=/象限|第[一二三四1234]|左上|右上|左下|右下|縱軸|橫軸/.test(chartDesc);
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const col=stepColors[pi%4];
+      const bgc=stepBg[pi%4];
+      // 步驟圓點標籤
+      ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(W/2-56,16,112,28,14);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='500 12px \'Noto Sans TC\',system-ui,sans-serif';
+      ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('步驟 '+(pi+1)+' / '+PN,W/2,30);
+      const step=phases[pi]||{};
+      // 畫四象限圖（steps 0,2 有圖才畫）
+      if(hasQuadrant&&(pi===0||pi===2)){
+        const qcx=W*0.72,qcy=H*0.5,ql=Math.min(W*0.22,H*0.35);
+        ctx.strokeStyle='rgba(100,116,139,0.5)';ctx.lineWidth=1.2;
+        ctx.beginPath();ctx.moveTo(qcx-ql,qcy);ctx.lineTo(qcx+ql,qcy);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(qcx,qcy-ql);ctx.lineTo(qcx,qcy+ql);ctx.stroke();
+        // 四個象限數字
+        const qLabels=[['①',qcx+ql*0.55,qcy-ql*0.55],['②',qcx-ql*0.55,qcy-ql*0.55],['③',qcx-ql*0.55,qcy+ql*0.55],['④',qcx+ql*0.55,qcy+ql*0.55]];
+        qLabels.forEach(([lb,x,y])=>{ctx.fillStyle='rgba(100,116,139,0.7)';ctx.font='600 13px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(lb,x,y);});
+        // 解析 formula 中的象限對應（轉職前/後 → 象限數字）
+        const f=(step.formula||'');
+        const mBefore=f.match(/轉職前[^①②③④]*([①②③④\d])/);
+        const mAfter=f.match(/轉職後[^①②③④]*([①②③④\d])/);
+        if(mBefore&&pi===2){
+          const qi=['①','②','③','④'].indexOf(mBefore[1]);
+          if(qi>=0){const [,x,y]=qLabels[qi];ctx.fillStyle=red;ctx.beginPath();ctx.arc(x,y,8*e,0,Math.PI*2);ctx.fill();LX(ctx,W,H,'轉職前',x,y+22,red,11,true);}
+        }
+        if(mAfter&&pi===2){
+          const qi=['①','②','③','④'].indexOf(mAfter[1]);
+          if(qi>=0){const [,x,y]=qLabels[qi];ctx.fillStyle=green;ctx.beginPath();ctx.arc(x,y,8*e,0,Math.PI*2);ctx.fill();LX(ctx,W,H,'轉職後',x,y+22,green,11,true);}
+        }
+      }
+      // 主要內容框（左側）
+      const bx=16,by=54,bw=hasQuadrant&&(pi===0||pi===2)?W*0.58-20:W-32,bh=H-70;
+      ctx.fillStyle=bgc;ctx.strokeStyle=col;ctx.lineWidth=0.8;
+      ctx.beginPath();ctx.roundRect(bx,by,bw,bh,8);ctx.fill();ctx.stroke();
+      // 標題
+      const title=(step.title||'');
+      ctx.fillStyle=col;ctx.font='600 14px \'Noto Sans TC\',system-ui,sans-serif';
+      ctx.textAlign='left';ctx.textBaseline='top';
+      ctx.fillText(title,bx+12,by+12);
+      // 分隔線
+      ctx.strokeStyle=col+'55';ctx.lineWidth=0.6;ctx.beginPath();ctx.moveTo(bx+12,by+32);ctx.lineTo(bx+bw-12,by+32);ctx.stroke();
+      // 內文（自動換行）
+      const bodyText=(step.formula||'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1').replace(/`([^`]+)`/g,'$1').replace(/#{1,6}\s*/g,'');
+      const lineH=22,maxW=bw-28,fs=13;
+      ctx.font=fs+'px \'Noto Sans TC\',system-ui,sans-serif';
+      ctx.fillStyle='#1E3A5F';
+      let curY=by+42;
+      bodyText.split(/\n|；/).forEach(seg=>{
+        if(!seg.trim()||curY>by+bh-14)return;
+        let line='';
+        for(const ch of seg){
+          const test=line+ch;
+          if(ctx.measureText(test).width>maxW&&line){
+            if(curY>by+bh-14)return;
+            ctx.fillText(line,bx+14,curY);curY+=lineH;line=ch;
+          }else line=test;
+        }
+        if(line&&curY<=by+bh-14){ctx.fillText(line,bx+14,curY);curY+=lineH;}
+      });
+      if(pi===PN-1&&e>0.5)ansBox(ctx,W,H,ans);
+    });
+  }
+
+  // ── 英文閱讀測驗 english_reading ────────────────────────
+  if(gtype==='english_reading'||gtype==='english_grammar'||gtype==='english_writing'||gtype==='english_cloze'){
+    const typeLabel={english_reading:'英文閱讀測驗',english_grammar:'英文文法/克漏字',english_writing:'英文翻譯/作文',english_cloze:'英文克漏字'}[gtype]||'英文';
+    const stepColors=[blue,amber,green,purple];
+    const stepBg=['rgba(12,68,124,0.08)','rgba(133,79,11,0.08)','rgba(8,80,65,0.08)','rgba(60,52,137,0.08)'];
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const col=stepColors[pi%4];
+      const bgc=stepBg[pi%4];
+      // 科目標籤（右上角）
+      ctx.fillStyle='rgba(24,95,165,0.12)';ctx.beginPath();ctx.roundRect(W-90,8,82,22,11);ctx.fill();
+      ctx.fillStyle='#185FA5';ctx.font='500 10px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText(typeLabel,W-49,19);
+      // 步驟標籤
+      ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(W/2-56,16,112,28,14);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='500 12px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('步驟 '+(pi+1)+' / '+PN,W/2,30);
+      const step=phases[pi]||{};
+      // 主框
+      const bx=16,by=54,bw=W-32,bh=H-70;
+      ctx.fillStyle=bgc;ctx.strokeStyle=col;ctx.lineWidth=0.8;
+      ctx.beginPath();ctx.roundRect(bx,by,bw,bh,8);ctx.fill();ctx.stroke();
+      ctx.fillStyle=col;ctx.font='600 14px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='left';ctx.textBaseline='top';
+      ctx.fillText(step.title||'',bx+12,by+12);
+      ctx.strokeStyle=col+'55';ctx.lineWidth=0.6;ctx.beginPath();ctx.moveTo(bx+12,by+32);ctx.lineTo(bx+bw-12,by+32);ctx.stroke();
+      const bodyText=(step.formula||'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1').replace(/`([^`]+)`/g,'$1').replace(/#{1,6}\s*/g,'');
+      const lineH=22,maxW=bw-28,fs=13;
+      ctx.font=fs+'px \'Noto Sans TC\',system-ui,sans-serif';ctx.fillStyle='#1E3A5F';
+      let curY=by+42;
+      bodyText.split(/\n|；/).forEach(seg=>{
+        if(!seg.trim()||curY>by+bh-14)return;
+        let line='';
+        for(const ch of seg){
+          const test=line+ch;
+          if(ctx.measureText(test).width>maxW&&line){if(curY>by+bh-14)return;ctx.fillText(line,bx+14,curY);curY+=lineH;line=ch;}else line=test;
+        }
+        if(line&&curY<=by+bh-14){ctx.fillText(line,bx+14,curY);curY+=lineH;}
+      });
+      if(pi===PN-1&&e>0.5)ansBox(ctx,W,H,ans);
+    });
+  }
+
+  // ── 觀念/名詞解釋 concept_mcq ────────────────────────────
+  // 化工/商管/國文觀念選擇題通用
+  if(gtype==='concept_mcq'||gtype==='chart_mcq'||gtype==='calculation'){
+    const typeLabel={concept_mcq:'觀念解析',chart_mcq:'圖表判讀',calculation:'計算題'}[gtype]||'解析';
+    const stepColors=[blue,amber,green,purple,'#A32D2D','#1D9E75'];
+    const stepBg=['rgba(12,68,124,0.08)','rgba(133,79,11,0.08)','rgba(8,80,65,0.08)','rgba(60,52,137,0.08)','rgba(163,45,45,0.08)','rgba(29,158,117,0.08)'];
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const col=stepColors[pi%6];const bgc=stepBg[pi%6];
+      ctx.fillStyle='rgba(24,95,165,0.12)';ctx.beginPath();ctx.roundRect(W-80,8,72,22,11);ctx.fill();
+      ctx.fillStyle='#185FA5';ctx.font='500 10px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(typeLabel,W-44,19);
+      ctx.fillStyle=col;ctx.beginPath();ctx.roundRect(W/2-56,16,112,28,14);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='500 12px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('步驟 '+(pi+1)+' / '+PN,W/2,30);
+      const step=phases[pi]||{};
+      const bx=16,by=54,bw=W-32,bh=H-70;
+      ctx.fillStyle=bgc;ctx.strokeStyle=col;ctx.lineWidth=0.8;
+      ctx.beginPath();ctx.roundRect(bx,by,bw,bh,8);ctx.fill();ctx.stroke();
+      ctx.fillStyle=col;ctx.font='600 14px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(step.title||'',bx+12,by+12);
+      ctx.strokeStyle=col+'55';ctx.lineWidth=0.6;ctx.beginPath();ctx.moveTo(bx+12,by+32);ctx.lineTo(bx+bw-12,by+32);ctx.stroke();
+      const bodyText=(step.formula||'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/\*([^*]+)\*/g,'$1').replace(/`([^`]+)`/g,'$1').replace(/#{1,6}\s*/g,'');
+      const lineH=22,maxW=bw-28,fs=13;
+      ctx.font=fs+'px \'Noto Sans TC\',system-ui,sans-serif';ctx.fillStyle='#1E3A5F';
+      let curY=by+42;
+      bodyText.split(/\n|；/).forEach(seg=>{
+        if(!seg.trim()||curY>by+bh-14)return;
+        let line='';
+        for(const ch of seg){const test=line+ch;if(ctx.measureText(test).width>maxW&&line){if(curY>by+bh-14)return;ctx.fillText(line,bx+14,curY);curY+=lineH;line=ch;}else line=test;}
+        if(line&&curY<=by+bh-14){ctx.fillText(line,bx+14,curY);curY+=lineH;}
+      });
+      if(pi===PN-1&&e>0.5)ansBox(ctx,W,H,ans);
+    });
+  }
+
+  // ── 流程圖 process_flow ──────────────────────────────────
+  if(gtype==='process_flow'){
+    const rawSteps=Array.isArray(gp.steps)&&gp.steps.length>0?gp.steps:phases.map(p=>p.title||'步驟');
+    const flowSteps=rawSteps.slice(0,6);
+    const boxColors=[blue,amber,green,purple,'#A32D2D','#1D9E75'];
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const n=flowSteps.length;
+      // 流程圖佈局：左右蛇形排列（3行×2列 或 直線）
+      const useGrid=n>3;
+      const boxW=Math.min((W-60)/(useGrid?2:n)-(useGrid?20:14),180);
+      const boxH=44;
+      const colGap=(W-60-boxW*2)/3;
+      const rowGap=(H-80)/(Math.ceil(n/2)+0.5);
+      flowSteps.forEach((s,i)=>{
+        const isActive=i<=pi;
+        const row=useGrid?Math.floor(i/2):0;
+        const col=useGrid?(row%2===0?i%2:1-i%2):i;
+        const bx=useGrid?(col===0?30+colGap:W-30-colGap-boxW):30+i*(boxW+(W-60-boxW*n)/(n-1||1));
+        const by=useGrid?50+row*rowGap:(H-boxH)/2;
+        // 箭頭（連接到下一個）
+        if(i<n-1&&isActive){
+          const ni=i+1,nr=useGrid?Math.floor(ni/2):0,nc=useGrid?(nr%2===0?ni%2:1-ni%2):ni;
+          const nbx=useGrid?(nc===0?30+colGap:W-30-colGap-boxW):30+ni*(boxW+(W-60-boxW*n)/(n-1||1));
+          const nby=useGrid?50+nr*rowGap:(H-boxH)/2;
+          const ax=bx+boxW/2,ay=by+boxH,nax=nbx+boxW/2,nay=nby;
+          if(useGrid&&row!==nr){arrowX(ctx,ax,ay,nax,nay,'#94A3B8',1.5);}
+          else if(!useGrid){arrowX(ctx,ax+(boxW/2)*1.1,by+boxH/2,nax-(boxW/2)*1.1,nay+boxH/2,'#94A3B8',1.5);}
+        }
+        // 方框
+        const col2=isActive?(i===pi?boxColors[i%6]:'rgba(100,116,139,0.6)'):'rgba(200,210,220,0.5)';
+        ctx.fillStyle=isActive?(i===pi?boxColors[i%6].replace(')',',0.12)').replace('rgb','rgba'):'rgba(240,245,251,0.9)'):'rgba(240,245,251,0.5)';
+        ctx.strokeStyle=col2;ctx.lineWidth=isActive&&i===pi?2:1;
+        ctx.beginPath();ctx.roundRect(bx,by,boxW,boxH,8);ctx.fill();ctx.stroke();
+        // 步驟編號圓圈
+        ctx.fillStyle=isActive?boxColors[i%6]:'#CBD5E1';ctx.beginPath();ctx.arc(bx+18,by+boxH/2,11,0,Math.PI*2);ctx.fill();
+        ctx.fillStyle='#fff';ctx.font='700 11px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(i+1,bx+18,by+boxH/2);
+        // 步驟文字
+        ctx.fillStyle=isActive?'#1E293B':'#94A3B8';ctx.font=(i===pi?'600':'400')+' 12px \'Noto Sans TC\',system-ui,sans-serif';
+        ctx.textAlign='left';ctx.textBaseline='middle';
+        const label=s.length>10?s.slice(0,10)+'…':s;
+        ctx.fillText(label,bx+34,by+boxH/2);
+      });
+      // 當前步驟說明框
+      const step=phases[pi]||{};
+      if(step.formula){
+        const fx=16,fy=H-72,fw=W-32,fh=62;
+        ctx.fillStyle='rgba(255,255,255,0.92)';ctx.strokeStyle=boxColors[pi%6];ctx.lineWidth=0.8;
+        ctx.beginPath();ctx.roundRect(fx,fy,fw,fh,7);ctx.fill();ctx.stroke();
+        ctx.fillStyle=boxColors[pi%6];ctx.font='600 12px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText('說明：',fx+10,fy+8);
+        ctx.fillStyle='#1E3A5F';ctx.font='12px \'Noto Sans TC\',system-ui,sans-serif';
+        const ft=(step.formula||'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/#{1,6}\s*/g,'').slice(0,60);
+        ctx.fillText(ft,fx+52,fy+8);
+        if(step.formula.length>60)ctx.fillText(step.formula.slice(60,110),fx+10,fy+30);
+      }
+      if(pi===PN-1&&e>0.5)ansBox(ctx,W,H,ans);
+    });
+  }
+
 return phases.map((_,pi)=>(ctx,W,H,e)=>{
     ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
     const step=phases[pi]||{};
@@ -1587,7 +1804,7 @@ function addResultCard(q,phaseFns,exps,cardId,origQuery){
 }
 
 // ── System prompt ─────────────────────────────────────
-const SYS='你是育達補習班AI老師，只回傳純JSON不加任何說明、不使用markdown（禁止用**、*、`、#）：\n{"question":"題目20字","graphType":"類型","graphParams":{},"explanations":[{"title":"標題","body":"詳細說明文字，至少2句話"}],"phases":[{"title":"步名","formula":"算式"}],"answer":"答案"}\ngraphType選擇：三角形→triangle；二次函數→quadratic；sin/cos→sincos；畢氏→pythagorean；RLC→rlc；v-t圖→vt；彈簧→spring；齒輪→gear；皮帶輪→pulley；圓→circle；圓周運動／向心力／離心力／彎道最高速限→circular_motion；向量→vector；一次函數→linear；線性規劃（最大化/最小化+不等式約束）→linear_programming；直流電路→dc_circuit；功率三角→power；摩擦盤→friction_disc；其他→text。\n【triangle格式】graphParams:{AB,AC,BC,angleA,angleB,angleC,cosA,sinA}，填入已知的邊長（數字）和角度（如"60°"），未知的不填。\n【circle格式】graphParams:{h,k,r}為原圓圓心(h,k)半徑r；若題目要求畫出新圓，同時填入nh,nk,nr為新圓參數；phases[0]=原圓資訊,phases[1]=新圓圓心半徑,phases[2]=新圓標準式,phases[3]=展開一般式。\n【circular_motion格式】graphParams:{R,mu,g}（R是彎道半徑公尺數值，禁止用circle類型）。\n【線性規劃嚴格格式】graphParams必須為{}；phases必須剛好4個；phases[0].formula必須包含所有不等式用分號分隔（例："15x+12y<=240;75x+25y<=750;x>=0,y>=0"）；phases[1].formula寫目標函數（例："P=25x+12y"）；phases[2].formula寫頂點列表（例："(0,0);(0,20);(10,0);(40/7,90/7)"）；phases[3].formula寫最優解計算（例："P(40/7,90/7)=2080/7"）；answer寫最終結果文字。禁止把計算結果放在phases[0]。\nphases和explanations數量必須相等（均為4個）。計算後驗算。friction_disc：graphParams:{Ro,Ri,mu,T,Ravg,F}，T=μ×F×Ravg單面。【單位嚴格規定】Ro、Ri、Ravg必須一律用「毫米mm」的數值；T必須用「牛頓-公分N-cm」的數值；F維持牛頓(N)數值。';
+const SYS='你是育達補習班AI老師，只回傳純JSON不加任何說明、不使用markdown（禁止用**、*、`、#）：\n{"question":"題目20字","graphType":"類型","graphParams":{},"explanations":[{"title":"標題","body":"詳細說明文字，至少2句話"}],"phases":[{"title":"步名","formula":"算式或說明"}],"answer":"答案"}\n\n【graphType 完整選擇表】\n數學/機件：三角形→triangle；二次函數→quadratic；sin/cos→sincos；畢氏→pythagorean；RLC→rlc；v-t圖→vt；彈簧→spring；齒輪→gear；皮帶輪→pulley；圓→circle；圓周運動/向心力/離心力/彎道→circular_motion；向量→vector；一次函數→linear；線性規劃→linear_programming；直流電路→dc_circuit；功率三角→power；摩擦盤→friction_disc。\n國文/閱讀測驗（含圖表判讀選擇題）→reading_chart。\n英文閱讀測驗→english_reading；英文文法/克漏字選擇→english_grammar；英文翻譯/作文→english_writing。\n化工/商管計算題→calculation；圖表判讀選擇（非數學圖形）→chart_mcq；觀念/名詞解釋選擇→concept_mcq；流程圖→process_flow。\n其他→text。\n\n【reading_chart 格式 - 閱讀測驗/圖表判讀】\ngraphParams:{chartDesc:"圖表結構說明（象限/座標軸意義，每個象限代表什麼）"}。\nphases必須剛好4個：phases[0].title="讀懂題目結構",formula=題目/圖表的關鍵結構（座標軸意義、象限定義）；phases[1].title="找出人物行為",formula=文本中人物的具體行為描述（直接引用或意譯原文，不可臆測）；phases[2].title="行為對應座標",formula=人物行為在圖中的位置（轉職前→X象限；轉職後→Y象限）；phases[3].title="比對選項得答案",formula=逐一比對選項，排除錯誤選項，得出正確答案。\n【reading_chart 鐵律】必須從文本出發找人物行為→再對應圖表位置→再比對選項，禁止直接猜答案。graphParams.chartDesc必須說明每個象限的意義。\n\n【english_reading 格式 - 英文閱讀測驗】\ngraphParams:{}。phases 4個：phases[0]文章主題與關鍵字，phases[1]題目定位（題目問什麼、到文章哪段找），phases[2]關鍵句意思解析（原文意思+中文說明），phases[3]選項逐一分析（排除錯誤答案，確認正確答案）。explanations同4個。\n\n【english_grammar 格式 - 文法選擇/克漏字】\ngraphParams:{}。phases 4個：phases[0]辨識題型（時態/語態/詞性/介系詞/連接詞等），phases[1]文法規則說明，phases[2]代入各選項驗證，phases[3]正確選項確認與口訣。explanations同4個。\n\n【english_writing 格式 - 翻譯/作文】\ngraphParams:{}。phases 3個：phases[0]分析句型/題目要求，phases[1]關鍵詞組與句型示範，phases[2]完整參考答案。explanations同3個。\n\n【concept_mcq 格式 - 觀念/名詞解釋選擇題（化工/商管/國文）】\ngraphParams:{}。phases 4個：phases[0]題目核心概念是什麼，phases[1]正確概念定義與說明，phases[2]每個選項逐一分析（正確/錯誤原因），phases[3]確認答案與記憶口訣。explanations同4個。\n\n【chart_mcq 格式 - 非數學圖表判讀選擇題】\ngraphParams:{chartDesc:"圖表類型與各軸/區段意義"}。phases 4個：phases[0]圖表結構說明，phases[1]題目問什麼，phases[2]從圖中找到對應位置或趨勢，phases[3]比對選項得答案。explanations同4個。\n\n【calculation 格式 - 化工/商管計算題（非圖形）】\ngraphParams:{}。phases 4個：phases[0]已知條件整理，phases[1]公式列出，phases[2]代入計算，phases[3]答案確認與單位。explanations同4個。\n\n【process_flow 格式 - 流程圖分析】\ngraphParams:{steps:["步驟1","步驟2","步驟3","步驟4"]}，steps最多6個。phases和explanations數量等於steps數量。\n\n【triangle格式】graphParams:{AB,AC,BC,angleA,angleB,angleC,cosA,sinA}，填入已知的邊長（數字）和角度（如"60°"），未知的不填。\n【circle格式】graphParams:{h,k,r}為原圓圓心(h,k)半徑r；若題目要求畫出新圓，同時填入nh,nk,nr為新圓參數；phases[0]=原圓資訊,phases[1]=新圓圓心半徑,phases[2]=新圓標準式,phases[3]=展開一般式。\n【circular_motion格式】graphParams:{R,mu,g}（R是彎道半徑公尺數值，禁止用circle類型）。\n【線性規劃嚴格格式】graphParams必須為{}；phases必須剛好4個；phases[0].formula必須包含所有不等式用分號分隔；phases[1].formula寫目標函數；phases[2].formula寫頂點列表；phases[3].formula寫最優解計算；answer寫最終結果文字。禁止把計算結果放在phases[0]。\nphases和explanations數量必須相等（計算/圖形題均為4個）。計算後驗算。friction_disc：graphParams:{Ro,Ri,mu,T,Ravg,F}，T=μ×F×Ravg單面。【單位嚴格規定】Ro、Ri、Ravg必須一律用「毫米mm」的數值；T必須用「牛頓-公分N-cm」的數值；F維持牛頓(N)數值。';
 
 // ── Send ──────────────────────────────────────────────
 async function send(){
