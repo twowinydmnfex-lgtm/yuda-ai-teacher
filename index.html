@@ -386,6 +386,15 @@ function buildPhaseFns(obj){
     'chart':'chart_mcq','非數學圖表':'chart_mcq',
     'calc':'calculation','數值計算':'calculation',
     'flow':'process_flow','流程圖':'process_flow','process':'process_flow',
+    // ── 新增：土木/機械/電機/商管群專用 ──
+    'free_body':'static_force','自由體圖':'static_force','statics':'static_force',
+    '靜力學':'static_force','力矩':'static_force','truss':'static_force',
+    'logic':'logic_gate','邏輯閘':'logic_gate','gate':'logic_gate',
+    '真值表':'logic_gate','boolean':'logic_gate','digital':'logic_gate',
+    'acc':'accounting','會計':'accounting','t_account':'accounting',
+    '分錄':'accounting','ledger':'accounting','借貸':'accounting',
+    'bjt':'transistor','fet':'transistor','電晶體':'transistor',
+    'transistor_curve':'transistor','特性曲線':'transistor',
   };
   let gtype=(obj.graphType||'text').trim();
   gtype=typeAlias[gtype]||gtype;
@@ -1654,6 +1663,363 @@ function buildPhaseFns(obj){
     });
   }
 
+  // ── 靜力學/自由體圖 static_force ─────────────────────────
+  // 土木建築群、機械群：靜力平衡、力矩、桁架
+  if(gtype==='static_force'){
+    // graphParams: {fx, fy, fz, angle, dist, moment, reactionA, reactionB, beamLen, loadType}
+    const beamLen=gp.beamLen||8; // 公尺
+    const loadType=gp.loadType||'point'; // point / distributed / moment
+    const loadF=gp.fy||gp.f||10; // kN
+    const loadDist=gp.dist||beamLen/2; // 距A點距離
+    const rA=gp.reactionA||parseFloat((loadF*(beamLen-loadDist)/beamLen).toFixed(2));
+    const rB=gp.reactionB||parseFloat((loadF*loadDist/beamLen).toFixed(2));
+    const angle=gp.angle||0; // 斜力角度（度）
+    const moment=gp.moment||0; // 力矩 kN-m
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const bx0=60,bx1=W-60,by=H*0.52,bh=18; // 梁的位置
+      const sc=(bx1-bx0)/beamLen; // 每公尺像素數
+      // 步驟標籤
+      ctx.fillStyle=blue;ctx.beginPath();ctx.roundRect(W/2-56,14,112,26,13);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='500 11px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('步驟 '+(pi+1)+' / '+PN,W/2,27);
+      // ── 梁本體 ──
+      ctx.fillStyle='rgba(24,95,165,0.12)';ctx.strokeStyle=pi===0?blue:'#64748B';ctx.lineWidth=2;
+      ctx.beginPath();ctx.roundRect(bx0,by-bh/2,bx1-bx0,bh,3);ctx.fill();ctx.stroke();
+      // A端（固定鉸支）三角形
+      const drawHinge=(x,y,col2)=>{
+        ctx.fillStyle=col2;ctx.beginPath();ctx.moveTo(x,y);ctx.lineTo(x-14,y+22);ctx.lineTo(x+14,y+22);ctx.closePath();ctx.fill();
+        ctx.strokeStyle=col2;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(x-18,y+22);ctx.lineTo(x+18,y+22);ctx.stroke();
+      };
+      // B端（滾支）圓形
+      const drawRoller=(x,y,col2)=>{
+        ctx.strokeStyle=col2;ctx.lineWidth=1.5;ctx.beginPath();ctx.arc(x,y+16,8,0,Math.PI*2);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(x-14,y+26);ctx.lineTo(x+14,y+26);ctx.stroke();
+      };
+      drawHinge(bx0,by+bh/2,pi>=2?green:'#64748B');
+      drawRoller(bx1,by+bh/2,pi>=2?green:'#64748B');
+      LX(ctx,W,H,'A',bx0,by+bh/2+36,'#1E293B',12,true);
+      LX(ctx,W,H,'B',bx1,by+bh/2+36,'#1E293B',12,true);
+      // 長度標示
+      if(pi>=0){
+        ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+        ctx.beginPath();ctx.moveTo(bx0,by+bh/2+44);ctx.lineTo(bx1,by+bh/2+44);ctx.stroke();
+        ctx.setLineDash([]);
+        LX(ctx,W,H,'L='+beamLen+' m',(bx0+bx1)/2,by+bh/2+55,'#64748B',11);
+      }
+      // ── pi==0：標示外力 ──
+      if(pi===0){
+        const lx=bx0+loadDist*sc;
+        if(loadType==='distributed'){
+          // 均布荷載
+          for(let xi=bx0;xi<=bx1;xi+=12){
+            arrowX(ctx,xi,by-bh/2-30,xi,by-bh/2-4,red,1.2);
+          }
+          ctx.strokeStyle=red;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(bx0,by-bh/2-30);ctx.lineTo(bx1,by-bh/2-30);ctx.stroke();
+          LX(ctx,W,H,'w='+loadF+' kN/m',(bx0+bx1)/2,by-bh/2-42,red,11,true);
+        } else {
+          // 集中力（可斜角）
+          const rad=angle*Math.PI/180;
+          const flen=52*e;
+          const dx2=Math.sin(rad)*flen,dy2=-Math.cos(rad)*flen;
+          arrowX(ctx,lx-dx2,by-bh/2-flen+dy2,lx,by-bh/2,red,2.5);
+          LX(ctx,W,H,'F='+loadF+'kN'+( angle?'  '+angle+'°':''),lx+( angle?20:-10),by-bh/2-flen-10,red,12,true);
+        }
+        if(loadDist>0&&loadDist<beamLen){
+          ctx.strokeStyle='#94A3B8';ctx.lineWidth=1;ctx.setLineDash([3,3]);
+          ctx.beginPath();ctx.moveTo(bx0+loadDist*sc,by-bh/2-60);ctx.lineTo(bx0+loadDist*sc,by+bh/2);ctx.stroke();
+          ctx.setLineDash([]);
+          LX(ctx,W,H,loadDist+'m',bx0+loadDist*sc/2+bx0/2,by-bh/2-8,'#94A3B8',11);
+        }
+        tBox(ctx,W,H,['已知：F='+loadF+' kN','a='+loadDist+' m，L='+beamLen+' m'],W*0.5,H*0.16,[blue,blue],12);
+      }
+      // ── pi==1：力矩方程式框 ──
+      if(pi===1){
+        const lx=bx0+loadDist*sc;
+        arrowX(ctx,lx,by-bh/2-44,lx,by-bh/2,red,2);
+        LX(ctx,W,H,'F='+loadF+'kN',lx+22,by-bh/2-28,red,11,true);
+        // 力矩方程式
+        const bDist=beamLen-loadDist;
+        tBox(ctx,W,H,
+          ['ΣMA=0：','RB×L = F×a',
+           'RB = '+loadF+'×'+loadDist+'/'+beamLen,
+           'RB = '+rB+' kN'],
+          W*0.76,H*0.25,[blue,blue,blue,red],12);
+      }
+      // ── pi==2：反力箭頭 ──
+      if(pi>=2){
+        const lx=bx0+loadDist*sc;
+        arrowX(ctx,lx,by-bh/2-40,lx,by-bh/2,red,1.8);
+        LX(ctx,W,H,'F='+loadF+'kN',lx+20,by-bh/2-24,red,11,true);
+        arrowX(ctx,bx0,by+bh/2+28,bx0,by+bh/2+4,green,2.8);
+        LX(ctx,W,H,'RA='+rA+' kN↑',bx0-36,by+bh/2+42,green,11,true);
+        arrowX(ctx,bx1,by+bh/2+28,bx1,by+bh/2+4,purple,2.8);
+        LX(ctx,W,H,'RB='+rB+' kN↑',bx1+36,by+bh/2+42,purple,11,true);
+        if(pi===PN-1){
+          tBox(ctx,W,H,['RA='+rA+' kN','RB='+rB+' kN','驗算：RA+RB='+parseFloat((rA+rB).toFixed(2))+' kN'],W*0.5,H*0.2,[green,purple,fgm],12);
+          if(e>0.6)ansBox(ctx,W,H,ans||'RA='+rA+'kN，RB='+rB+'kN');
+        }
+      }
+    });
+  }
+
+  // ── 邏輯閘/真值表 logic_gate ──────────────────────────────
+  // 電機電子群、資訊群：AND/OR/NOT/NAND/NOR/XOR
+  if(gtype==='logic_gate'){
+    const gateType=(gp.gate||'AND').toUpperCase();
+    const inputs=Array.isArray(gp.inputs)?gp.inputs:(gp.inputs||'AB').split('');
+    const expression=gp.expression||gateType+'('+inputs.join(',')+')';
+    // 產生真值表
+    const n=Math.min(inputs.length,3);
+    const rows=Math.pow(2,n);
+    function evalGate(type,vals){
+      switch(type){
+        case'AND':return vals.every(v=>v===1)?1:0;
+        case'OR':return vals.some(v=>v===1)?1:0;
+        case'NOT':return vals[0]===1?0:1;
+        case'NAND':return vals.every(v=>v===1)?0:1;
+        case'NOR':return vals.some(v=>v===1)?0:1;
+        case'XOR':return vals.reduce((a,b)=>a^b,0);
+        case'XNOR':return vals.reduce((a,b)=>a^b,0)===0?1:0;
+        default:return 0;
+      }
+    }
+    const table=[];
+    for(let r=0;r<rows;r++){
+      const vals=[];for(let b=n-1;b>=0;b--)vals.push((r>>b)&1);
+      table.push({inputs:vals,output:evalGate(gateType,vals)});
+    }
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      ctx.fillStyle=purple;ctx.beginPath();ctx.roundRect(W/2-56,14,112,26,13);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='500 11px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('步驟 '+(pi+1)+' / '+PN,W/2,27);
+      // ── 左側：邏輯閘符號圖 ──
+      const gx=W*0.28,gy=H*0.46,gw=54,gh=44;
+      const drawGateSymbol=(type,cx,cy)=>{
+        ctx.strokeStyle=purple;ctx.lineWidth=2.2;ctx.fillStyle='rgba(60,52,137,0.10)';
+        if(type==='AND'){
+          ctx.beginPath();ctx.moveTo(cx-gw/2,cy-gh/2);ctx.lineTo(cx,cy-gh/2);ctx.arc(cx,cy,gh/2,Math.PI*1.5,Math.PI*0.5);ctx.lineTo(cx-gw/2,cy+gh/2);ctx.closePath();ctx.fill();ctx.stroke();
+        } else if(type==='OR'||type==='XOR'||type==='XNOR'){
+          ctx.beginPath();ctx.moveTo(cx-gw/2,cy-gh/2);ctx.quadraticCurveTo(cx+gw*0.1,cy,cx-gw/2,cy+gh/2);ctx.quadraticCurveTo(cx,cy+gh/2+8,cx+gw/2,cy);ctx.quadraticCurveTo(cx,cy-gh/2-8,cx-gw/2,cy-gh/2);ctx.fill();ctx.stroke();
+          if(type==='XOR'||type==='XNOR'){ctx.beginPath();ctx.moveTo(cx-gw/2-6,cy-gh/2);ctx.quadraticCurveTo(cx-gw*0.35,cy,cx-gw/2-6,cy+gh/2);ctx.stroke();}
+        } else if(type==='NOT'){
+          ctx.beginPath();ctx.moveTo(cx-gw/2,cy-gh/2);ctx.lineTo(cx+gw/2-8,cy);ctx.lineTo(cx-gw/2,cy+gh/2);ctx.closePath();ctx.fill();ctx.stroke();
+          ctx.beginPath();ctx.arc(cx+gw/2-4,cy,4,0,Math.PI*2);ctx.stroke();
+        } else { // NAND NOR
+          if(type==='NAND'){ctx.beginPath();ctx.moveTo(cx-gw/2,cy-gh/2);ctx.lineTo(cx,cy-gh/2);ctx.arc(cx,cy,gh/2,Math.PI*1.5,Math.PI*0.5);ctx.lineTo(cx-gw/2,cy+gh/2);ctx.closePath();ctx.fill();ctx.stroke();}
+          else{ctx.beginPath();ctx.moveTo(cx-gw/2,cy-gh/2);ctx.quadraticCurveTo(cx+gw*0.1,cy,cx-gw/2,cy+gh/2);ctx.quadraticCurveTo(cx,cy+gh/2+8,cx+gw/2,cy);ctx.quadraticCurveTo(cx,cy-gh/2-8,cx-gw/2,cy-gh/2);ctx.fill();ctx.stroke();}
+          ctx.beginPath();ctx.arc(cx+gw/2+4,cy,4,0,Math.PI*2);ctx.stroke();
+        }
+        LX(ctx,W,H,type,cx,cy,purple,13,true);
+      };
+      drawGateSymbol(gateType,gx,gy);
+      // 輸入線
+      const inY=n===1?[gy]:[gy-14,gy+14];
+      inY.forEach((y,i)=>{
+        ctx.strokeStyle='#64748B';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(gx-gw/2-30,y);ctx.lineTo(gx-gw/2,y);ctx.stroke();
+        LX(ctx,W,H,inputs[i]||('A'+i),gx-gw/2-38,y,'#1E293B',12,true);
+      });
+      ctx.strokeStyle='#64748B';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(gx+gw/2+(gateType.includes('N')||gateType==='NOT'?8:0),gy);ctx.lineTo(gx+gw/2+36,gy);ctx.stroke();
+      LX(ctx,W,H,'Y',gx+gw/2+44,gy,'#1E293B',12,true);
+      LX(ctx,W,H,'Y='+expression,gx,gy+gh/2+22,purple,11);
+      // ── 右側：真值表 ──
+      const tLeft=W*0.52,tTop=50,colW=36,rowH=26;
+      const headers=[...inputs,'Y'];
+      const tW=headers.length*colW+8,tH=(rows+1)*rowH+8;
+      // 表格底框
+      ctx.fillStyle='rgba(255,255,255,0.9)';ctx.strokeStyle='rgba(60,52,137,0.3)';ctx.lineWidth=0.8;
+      ctx.beginPath();ctx.roundRect(tLeft,tTop,tW,tH,6);ctx.fill();ctx.stroke();
+      // 表頭
+      ctx.fillStyle='rgba(60,52,137,0.12)';ctx.beginPath();ctx.roundRect(tLeft,tTop,tW,rowH,6);ctx.fill();
+      headers.forEach((h,i)=>{
+        ctx.fillStyle=i===headers.length-1?purple:'#1E293B';ctx.font='600 12px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(h,tLeft+colW*i+colW/2+4,tTop+rowH/2);
+      });
+      // 行
+      const showRows=pi===0?Math.ceil(rows*(0.4+e*0.6)):rows;
+      table.slice(0,showRows).forEach((row,ri)=>{
+        const ry=tTop+(ri+1)*rowH;
+        if(ri%2===0){ctx.fillStyle='rgba(240,245,251,0.7)';ctx.fillRect(tLeft+1,ry,tW-2,rowH);}
+        row.inputs.forEach((v,ci)=>{
+          ctx.fillStyle=v===1?blue:'#64748B';ctx.font='500 13px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText(v,tLeft+colW*ci+colW/2+4,ry+rowH/2);
+        });
+        const outCol=headers.length-1;
+        ctx.fillStyle=row.output===1?green:red;ctx.font='700 13px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText(row.output,tLeft+colW*outCol+colW/2+4,ry+rowH/2);
+        // 分隔線
+        ctx.strokeStyle='rgba(60,52,137,0.1)';ctx.lineWidth=0.5;ctx.beginPath();ctx.moveTo(tLeft,ry);ctx.lineTo(tLeft+tW,ry);ctx.stroke();
+      });
+      // 輸入/輸出分隔線
+      ctx.strokeStyle='rgba(60,52,137,0.3)';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(tLeft+colW*(headers.length-1)+4,tTop);ctx.lineTo(tLeft+colW*(headers.length-1)+4,tTop+tH);ctx.stroke();
+      if(pi===PN-1&&e>0.6){
+        const ones=table.filter(r=>r.output===1).length;
+        tBox(ctx,W,H,['輸出為1的組合：'+ones+'/'+rows+'種'],W*0.28,H*0.85,[purple],11);
+        ansBox(ctx,W,H,ans);
+      }
+    });
+  }
+
+  // ── 會計T字帳/借貸分錄 accounting ─────────────────────────
+  // 商業管理群：借貸分錄、T字帳、會計方程式
+  if(gtype==='accounting'){
+    // graphParams: {accounts:[{name,debit,credit}], equation:{assets,liabilities,equity}}
+    const accounts=Array.isArray(gp.accounts)&&gp.accounts.length>0
+      ?gp.accounts
+      :[{name:'帳戶',debit:gp.debit||0,credit:gp.credit||0}];
+    const eq=gp.equation||null;
+    const acColors=[blue,red,green,purple,amber];
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      ctx.fillStyle=amber;ctx.beginPath();ctx.roundRect(W/2-56,14,112,26,13);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='500 11px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('步驟 '+(pi+1)+' / '+PN,W/2,27);
+      const step=phases[pi]||{};
+      // ── pi==0：會計方程式 or 分錄說明 ──
+      if(pi===0){
+        const eqY=H*0.38;
+        if(eq){
+          // 畫會計恆等式
+          const parts=[{label:'資產',val:eq.assets,col:blue},{label:'=',val:'',col:'#64748B'},{label:'負債',val:eq.liabilities,col:red},{label:'+',val:'',col:'#64748B'},{label:'業主權益',val:eq.equity,col:green}];
+          let curX=30;
+          parts.forEach(p=>{
+            ctx.fillStyle=p.col;ctx.font=(p.val?'600':'400')+' 14px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='left';ctx.textBaseline='middle';
+            ctx.fillText(p.label,curX,eqY);
+            if(p.val!==undefined&&p.val!==''){
+              ctx.fillStyle=p.col;ctx.font='400 12px \'Noto Sans TC\',system-ui,sans-serif';
+              ctx.fillText('$'+p.val,curX,eqY+20);
+            }
+            curX+=ctx.measureText(p.label).width+16;
+          });
+        }
+        // 分錄說明
+        const bodyText=(step.formula||'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/#{1,6}\s*/g,'');
+        const bx=16,by=54,bw=W-32,bh=H*0.38-10;
+        ctx.fillStyle='rgba(133,79,11,0.08)';ctx.strokeStyle=amber;ctx.lineWidth=0.8;
+        ctx.beginPath();ctx.roundRect(bx,by,bw,bh,8);ctx.fill();ctx.stroke();
+        ctx.fillStyle=amber;ctx.font='600 13px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(step.title||'分錄說明',bx+12,by+10);
+        ctx.fillStyle='#1E3A5F';ctx.font='12px \'Noto Sans TC\',system-ui,sans-serif';
+        let curY=by+32;
+        bodyText.split(/\n|；/).forEach(seg=>{if(!seg.trim()||curY>by+bh-10)return;ctx.fillText(seg.slice(0,40),bx+12,curY);curY+=20;});
+      }
+      // ── pi>=1：T字帳 ──
+      if(pi>=1){
+        const showN=Math.min(pi,accounts.length);
+        const tW=Math.min((W-40)/showN,180);
+        const tH=Math.min(H*0.55,160);
+        const tTop=H*0.12,gap=(W-40-tW*showN)/(showN+1);
+        accounts.slice(0,showN).forEach((acc,ai)=>{
+          const tx=40+gap*(ai+1)+tW*ai,ty=tTop;
+          const col2=acColors[ai%5];
+          // T字外框
+          ctx.fillStyle='rgba(255,255,255,0.92)';ctx.strokeStyle=col2;ctx.lineWidth=1.2;
+          ctx.beginPath();ctx.roundRect(tx,ty,tW,tH,6);ctx.fill();ctx.stroke();
+          // 帳戶名稱欄
+          ctx.fillStyle=col2;ctx.beginPath();ctx.roundRect(tx,ty,tW,24,6);ctx.fill();
+          ctx.fillStyle='#fff';ctx.font='600 11px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(acc.name||'帳戶',tx+tW/2,ty+12);
+          // 借/貸標題
+          ctx.fillStyle='#334155';ctx.font='500 11px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText('借方',tx+tW*0.25,ty+38);ctx.fillText('貸方',tx+tW*0.75,ty+38);
+          // T字中線
+          ctx.strokeStyle=col2+'66';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(tx+tW/2,ty+28);ctx.lineTo(tx+tW/2,ty+tH);ctx.stroke();
+          ctx.beginPath();ctx.moveTo(tx,ty+50);ctx.lineTo(tx+tW,ty+50);ctx.stroke();
+          // 借方金額
+          if(acc.debit){
+            ctx.fillStyle=blue;ctx.font='500 13px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+            ctx.fillText('$'+acc.debit,tx+tW*0.25,ty+70);
+          }
+          // 貸方金額
+          if(acc.credit){
+            ctx.fillStyle=red;ctx.font='500 13px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+            ctx.fillText('$'+acc.credit,tx+tW*0.75,ty+70);
+          }
+          // 餘額
+          const bal=((acc.debit||0)-(acc.credit||0));
+          const balStr=(bal>=0?'借餘 $'+bal:'貸餘 $'+Math.abs(bal));
+          ctx.fillStyle=bal>=0?blue:red;ctx.font='600 11px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText(balStr,tx+tW/2,ty+tH-14);
+          // 餘額底線
+          ctx.strokeStyle=col2+'44';ctx.lineWidth=0.8;ctx.beginPath();ctx.moveTo(tx+8,ty+tH-26);ctx.lineTo(tx+tW-8,ty+tH-26);ctx.stroke();
+        });
+        // 步驟說明框（底部）
+        const bodyText=(step.formula||'').replace(/\*\*([^*]+)\*\*/g,'$1').replace(/#{1,6}\s*/g,'');
+        const bx=16,bfy=H-68,bfw=W-32,bfh=58;
+        ctx.fillStyle='rgba(255,255,255,0.92)';ctx.strokeStyle=amber;ctx.lineWidth=0.8;
+        ctx.beginPath();ctx.roundRect(bx,bfy,bfw,bfh,7);ctx.fill();ctx.stroke();
+        ctx.fillStyle=amber;ctx.font='600 12px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='left';ctx.textBaseline='top';ctx.fillText(step.title||'',bx+10,bfy+8);
+        ctx.fillStyle='#1E3A5F';ctx.font='12px \'Noto Sans TC\',system-ui,sans-serif';
+        const ft=bodyText.slice(0,50);ctx.fillText(ft,bx+10,bfy+28);
+        if(bodyText.length>50)ctx.fillText(bodyText.slice(50,100),bx+10,bfy+44);
+      }
+      if(pi===PN-1&&e>0.5)ansBox(ctx,W,H,ans);
+    });
+  }
+
+  // ── 電晶體特性曲線 transistor ─────────────────────────────
+  // 電機電子群：BJT/FET 輸出特性曲線、工作點
+  if(gtype==='transistor'){
+    const type2=gp.type||'BJT'; // BJT or FET
+    const VCC=gp.VCC||12,RC=gp.RC||2,IB=gp.IB||0.04,hFE=gp.hFE||100;
+    const IC_sat=parseFloat((VCC/RC).toFixed(2));
+    const IC_Q=parseFloat((hFE*IB).toFixed(2));
+    const VCE_Q=parseFloat((VCC-IC_Q*RC).toFixed(2));
+    const curves=gp.curves||[0.02,0.04,0.06,0.08].map(ib=>({ib,ic:hFE*ib}));
+    return phases.map((_,pi)=>(ctx,W,H,e)=>{
+      ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+      const ox=64,oy=H-52,pw=W-90,ph=H-80;
+      const scx=pw/Math.max(VCC*1.2,10),scy=ph/Math.max(IC_sat*1.4,1);
+      // 步驟標籤
+      ctx.fillStyle='#A32D2D';ctx.beginPath();ctx.roundRect(W/2-56,14,112,26,13);ctx.fill();
+      ctx.fillStyle='#fff';ctx.font='500 11px \'Noto Sans TC\',system-ui,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.fillText('步驟 '+(pi+1)+' / '+PN,W/2,27);
+      // 座標軸
+      arrowX(ctx,ox,oy,ox+pw+14,oy,'#64748B',1.5);
+      arrowX(ctx,ox,oy,ox,oy-ph-14,'#64748B',1.5);
+      LX(ctx,W,H,type2==='FET'?'VDS (V)':'VCE (V)',ox+pw+24,oy,'#64748B',11);
+      LX(ctx,W,H,type2==='FET'?'ID (mA)':'IC (mA)',ox,oy-ph-22,'#64748B',11);
+      LX(ctx,W,H,'O',ox-14,oy+12,'#64748B',11);
+      // 刻度
+      for(let v=2;v<=VCC*1.2;v+=2){ctx.strokeStyle='#E2E8F0';ctx.lineWidth=0.7;ctx.beginPath();ctx.moveTo(ox+v*scx,oy-4);ctx.lineTo(ox+v*scx,oy-ph);ctx.stroke();LX(ctx,W,H,v+'',ox+v*scx,oy+12,'#94A3B8',10);}
+      // 特性曲線
+      if(pi>=0){
+        const showC=pi===0?Math.ceil(curves.length*e):curves.length;
+        curves.slice(0,showC).forEach((c,ci)=>{
+          const ic=c.ic;const icPx=oy-ic*scy;
+          ctx.strokeStyle=`rgba(${60+ci*40},${80+ci*20},${180-ci*20},0.75)`;ctx.lineWidth=1.8;
+          ctx.beginPath();ctx.moveTo(ox+0.3*scx,icPx+6);ctx.quadraticCurveTo(ox+1.2*scx,icPx,ox+VCC*1.15*scx,icPx*(pi===0&&ci===showC-1?lerp(1,1,e):1));ctx.stroke();
+          const ibLabel=type2==='FET'?'VGS='+(c.ib*25).toFixed(0)+'V':(type2==='BJT'?'IB='+(c.ib*1000).toFixed(0)+'μA':'');
+          LX(ctx,W,H,ibLabel,ox+pw*0.85,icPx-8,`rgba(${60+ci*40},${80+ci*20},${180-ci*20},1)`,10);
+        });
+      }
+      // 直流負載線
+      if(pi>=1){
+        ctx.strokeStyle='#A32D2D';ctx.lineWidth=2;ctx.setLineDash([6,4]);
+        ctx.beginPath();ctx.moveTo(ox,oy-IC_sat*scy*(pi===1?e:1));ctx.lineTo(ox+VCC*scx*(pi===1?e:1),oy);ctx.stroke();
+        ctx.setLineDash([]);
+        LX(ctx,W,H,'直流負載線',ox+VCC*scx*0.5,oy-IC_sat*scy*0.5-14,red,11,true);
+        LX(ctx,W,H,'IC_sat='+IC_sat+'mA',ox-6,oy-IC_sat*scy-10,red,11);
+        LX(ctx,W,H,'VCC='+VCC+'V',ox+VCC*scx,oy+14,red,11);
+      }
+      // 工作點Q
+      if(pi>=2){
+        const qx=ox+VCE_Q*scx,qy=oy-IC_Q*scy;
+        ctx.fillStyle=green;ctx.beginPath();ctx.arc(qx,qy,7*(pi===2?e:1),0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle=green;ctx.lineWidth=1;ctx.setLineDash([3,3]);
+        ctx.beginPath();ctx.moveTo(qx,oy);ctx.lineTo(qx,qy);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(ox,qy);ctx.lineTo(qx,qy);ctx.stroke();
+        ctx.setLineDash([]);
+        LX(ctx,W,H,'Q',qx+16,qy-14,green,13,true);
+        LX(ctx,W,H,'VCE_Q='+VCE_Q+'V',ox+VCE_Q*scx,oy+14,green,11);
+        LX(ctx,W,H,'IC_Q='+IC_Q+'mA',ox-6,oy-IC_Q*scy-10,green,11);
+        if(pi===PN-1){
+          tBox(ctx,W,H,['Q點：VCE='+VCE_Q+'V','IC='+IC_Q+'mA'],W*0.78,H*0.22,[green,green],11);
+          if(e>0.6)ansBox(ctx,W,H,ans||'VCE='+VCE_Q+'V，IC='+IC_Q+'mA');
+        }
+      }
+    });
+  }
+
 return phases.map((_,pi)=>(ctx,W,H,e)=>{
     ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
     const step=phases[pi]||{};
@@ -1804,7 +2170,7 @@ function addResultCard(q,phaseFns,exps,cardId,origQuery){
 }
 
 // ── System prompt ─────────────────────────────────────
-const SYS='你是育達補習班AI老師，只回傳純JSON不加任何說明、不使用markdown（禁止用**、*、`、#）：\n{"question":"題目20字","graphType":"類型","graphParams":{},"explanations":[{"title":"標題","body":"詳細說明文字，至少2句話"}],"phases":[{"title":"步名","formula":"算式或說明"}],"answer":"答案"}\n\n【graphType 完整選擇表】\n數學/機件：三角形→triangle；二次函數→quadratic；sin/cos→sincos；畢氏→pythagorean；RLC→rlc；v-t圖→vt；彈簧→spring；齒輪→gear；皮帶輪→pulley；圓→circle；圓周運動/向心力/離心力/彎道→circular_motion；向量→vector；一次函數→linear；線性規劃→linear_programming；直流電路→dc_circuit；功率三角→power；摩擦盤→friction_disc。\n國文/閱讀測驗（含圖表判讀選擇題）→reading_chart。\n英文閱讀測驗→english_reading；英文文法/克漏字選擇→english_grammar；英文翻譯/作文→english_writing。\n化工/商管計算題→calculation；圖表判讀選擇（非數學圖形）→chart_mcq；觀念/名詞解釋選擇→concept_mcq；流程圖→process_flow。\n其他→text。\n\n【reading_chart 格式 - 閱讀測驗/圖表判讀】\ngraphParams:{chartDesc:"圖表結構說明（象限/座標軸意義，每個象限代表什麼）"}。\nphases必須剛好4個：phases[0].title="讀懂題目結構",formula=題目/圖表的關鍵結構（座標軸意義、象限定義）；phases[1].title="找出人物行為",formula=文本中人物的具體行為描述（直接引用或意譯原文，不可臆測）；phases[2].title="行為對應座標",formula=人物行為在圖中的位置（轉職前→X象限；轉職後→Y象限）；phases[3].title="比對選項得答案",formula=逐一比對選項，排除錯誤選項，得出正確答案。\n【reading_chart 鐵律】必須從文本出發找人物行為→再對應圖表位置→再比對選項，禁止直接猜答案。graphParams.chartDesc必須說明每個象限的意義。\n\n【english_reading 格式 - 英文閱讀測驗】\ngraphParams:{}。phases 4個：phases[0]文章主題與關鍵字，phases[1]題目定位（題目問什麼、到文章哪段找），phases[2]關鍵句意思解析（原文意思+中文說明），phases[3]選項逐一分析（排除錯誤答案，確認正確答案）。explanations同4個。\n\n【english_grammar 格式 - 文法選擇/克漏字】\ngraphParams:{}。phases 4個：phases[0]辨識題型（時態/語態/詞性/介系詞/連接詞等），phases[1]文法規則說明，phases[2]代入各選項驗證，phases[3]正確選項確認與口訣。explanations同4個。\n\n【english_writing 格式 - 翻譯/作文】\ngraphParams:{}。phases 3個：phases[0]分析句型/題目要求，phases[1]關鍵詞組與句型示範，phases[2]完整參考答案。explanations同3個。\n\n【concept_mcq 格式 - 觀念/名詞解釋選擇題（化工/商管/國文）】\ngraphParams:{}。phases 4個：phases[0]題目核心概念是什麼，phases[1]正確概念定義與說明，phases[2]每個選項逐一分析（正確/錯誤原因），phases[3]確認答案與記憶口訣。explanations同4個。\n\n【chart_mcq 格式 - 非數學圖表判讀選擇題】\ngraphParams:{chartDesc:"圖表類型與各軸/區段意義"}。phases 4個：phases[0]圖表結構說明，phases[1]題目問什麼，phases[2]從圖中找到對應位置或趨勢，phases[3]比對選項得答案。explanations同4個。\n\n【calculation 格式 - 化工/商管計算題（非圖形）】\ngraphParams:{}。phases 4個：phases[0]已知條件整理，phases[1]公式列出，phases[2]代入計算，phases[3]答案確認與單位。explanations同4個。\n\n【process_flow 格式 - 流程圖分析】\ngraphParams:{steps:["步驟1","步驟2","步驟3","步驟4"]}，steps最多6個。phases和explanations數量等於steps數量。\n\n【triangle格式】graphParams:{AB,AC,BC,angleA,angleB,angleC,cosA,sinA}，填入已知的邊長（數字）和角度（如"60°"），未知的不填。\n【circle格式】graphParams:{h,k,r}為原圓圓心(h,k)半徑r；若題目要求畫出新圓，同時填入nh,nk,nr為新圓參數；phases[0]=原圓資訊,phases[1]=新圓圓心半徑,phases[2]=新圓標準式,phases[3]=展開一般式。\n【circular_motion格式】graphParams:{R,mu,g}（R是彎道半徑公尺數值，禁止用circle類型）。\n【線性規劃嚴格格式】graphParams必須為{}；phases必須剛好4個；phases[0].formula必須包含所有不等式用分號分隔；phases[1].formula寫目標函數；phases[2].formula寫頂點列表；phases[3].formula寫最優解計算；answer寫最終結果文字。禁止把計算結果放在phases[0]。\nphases和explanations數量必須相等（計算/圖形題均為4個）。計算後驗算。friction_disc：graphParams:{Ro,Ri,mu,T,Ravg,F}，T=μ×F×Ravg單面。【單位嚴格規定】Ro、Ri、Ravg必須一律用「毫米mm」的數值；T必須用「牛頓-公分N-cm」的數值；F維持牛頓(N)數值。';
+const SYS='你是育達補習班AI老師，只回傳純JSON不加任何說明、不使用markdown（禁止用**、*、`、#）：\n{"question":"題目20字","graphType":"類型","graphParams":{},"explanations":[{"title":"標題","body":"詳細說明文字，至少2句話"}],"phases":[{"title":"步名","formula":"算式或說明"}],"answer":"答案"}\n\n【graphType 完整選擇表】\n數學/機件：triangle；quadratic；sincos；pythagorean；rlc；vt；spring；gear；pulley；circle；circular_motion；vector；linear；linear_programming；dc_circuit；power；friction_disc。\n土木/機械力學→static_force。電機電子/資訊→logic_gate；transistor。商管會計→accounting。\n國文/閱讀測驗（含圖表判讀）→reading_chart。英文閱讀→english_reading；文法/克漏字→english_grammar；翻譯/作文→english_writing。\n化工/商管計算→calculation；非數學圖表判讀→chart_mcq；觀念/名詞解釋→concept_mcq；流程圖→process_flow。\n其他→text。\n\n【static_force 格式 - 靜力學/梁的反力/力矩】\ngraphParams:{beamLen:梁長公尺,loadType:"point或distributed",fy:力kN,dist:距A點距離公尺,reactionA:RA值,reactionB:RB值,angle:斜力角度(無斜力填0)}。\nphases 4個：phases[0]畫自由體圖標外力,phases[1]對A點取力矩求RB,phases[2]由ΣFy=0求RA,phases[3]驗算。explanations同4個。\n\n【logic_gate 格式 - 邏輯閘/真值表】\ngraphParams:{gate:"AND或OR或NOT或NAND或NOR或XOR或XNOR",inputs:["A","B"],expression:"布林表示式"}。\nphases 4個：phases[0]認識閘符號與邏輯運算,phases[1]列出真值表輸入組合,phases[2]逐行計算輸出,phases[3]確認答案。explanations同4個。\n\n【accounting 格式 - 借貸分錄/T字帳】\ngraphParams:{accounts:[{name:"帳戶名",debit:借方金額,credit:貸方金額}],equation:{assets:資產,liabilities:負債,equity:業主權益}}。accounts最多4個。\nphases 4個：phases[0]分析交易本質,phases[1]判斷借貸方向（資產增→借方；負債增→貸方），phases[2]填寫分錄,phases[3]過帳T字帳確認餘額。explanations同4個。\n\n【transistor 格式 - 電晶體特性曲線/工作點】\ngraphParams:{type:"BJT或FET",VCC:電源電壓,RC:集極電阻kΩ,IB:基極電流mA,hFE:電流增益,curves:[{ib:基極電流,ic:集極電流}]}。\nphases 4個：phases[0]認識特性曲線族,phases[1]畫直流負載線（兩端點：飽和點與截止點）,phases[2]找工作點Q（負載線與IB曲線交點）,phases[3]計算VCE與IC。explanations同4個。\n\n【reading_chart 格式 - 閱讀測驗/圖表判讀】\ngraphParams:{chartDesc:"圖表結構（座標軸/象限意義）"}。phases 4個：phases[0]讀懂圖表結構,phases[1]找出人物具體行為（引用原文），phases[2]行為對應座標位置,phases[3]逐一比對選項。禁止直接猜答案。\n\n【english_reading 格式】graphParams:{}。phases 4個：主題/關鍵字,題目定位,關鍵句解析,選項逐一分析。\n【english_grammar 格式】graphParams:{}。phases 4個：辨識題型,文法規則,代入驗證,確認+口訣。\n【english_writing 格式】graphParams:{}。phases 3個：句型分析,詞組示範,完整答案。\n【concept_mcq 格式】graphParams:{}。phases 4個：核心概念,定義說明,選項分析,答案+口訣。\n【chart_mcq 格式】graphParams:{chartDesc:"圖表說明"}。phases 4個：圖表結構,題目問什麼,對應位置,比對選項。\n【calculation 格式】graphParams:{}。phases 4個：已知整理,公式,代入計算,答案+單位。\n【process_flow 格式】graphParams:{steps:["步驟1",...]}，steps最多6個，phases數量=steps數量。\n\n【數學/機件格式（既有）】\ntriangle:{AB,AC,BC,angleA,angleB,angleC}。circle:{h,k,r,nh,nk,nr}。circular_motion:{R,mu,g}。linear_programming:phases剛好4個,phases[0]含不等式,phases[1]目標函數,phases[2]頂點列表,phases[3]最優解。friction_disc:{Ro,Ri,mu,T,Ravg,F}，Ro/Ri/Ravg單位mm，T單位N-cm。\n\nphases和explanations數量必須相等。計算題計算後驗算答案。';
 
 // ── Send ──────────────────────────────────────────────
 async function send(){
