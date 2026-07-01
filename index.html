@@ -2427,7 +2427,25 @@ async function send(){
         body: ph.formula?('這一步的計算：'+ph.formula):'這個步驟的詳細說明暫時沒有顯示出來，可以參考左側圖示的計算過程。'
       });
     }
-    addResultCard(obj.question||dispQ,buildPhaseFns(obj),explanationsArr,cardId,dispQ);
+    // ── 圖形與解說解耦：圖形產生失敗不能連累解說卡片 ──
+    // buildPhaseFns 內部若因 graphParams 異常等原因拋出例外，
+    // 改用最小佔位圖形頂上，確保右側「老師說明」一定能正常顯示。
+    let phaseFns;
+    try{
+      phaseFns=buildPhaseFns(obj);
+      if(!Array.isArray(phaseFns)||phaseFns.length===0) throw new Error('empty phaseFns');
+    }catch(gErr){
+      console.warn('⚠️ 圖形產生失敗，改用佔位圖形，解說不受影響：',gErr);
+      phaseFns=[(ctx,W,H)=>{
+        ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+        ctx.fillStyle='#94A3B8';ctx.font='500 14px \'Noto Sans TC\',system-ui,sans-serif';
+        ctx.textAlign='center';ctx.textBaseline='middle';
+        ctx.fillText('圖形暫時無法顯示，請參考右側說明',W/2,H/2-10);
+        ctx.font='400 12px \'Noto Sans TC\',system-ui,sans-serif';
+        ctx.fillText('解題步驟與答案不受影響',W/2,H/2+16);
+      }];
+    }
+    addResultCard(obj.question||dispQ,phaseFns,explanationsArr,cardId,dispQ);
   }catch(err){
     removeTyping();
     let msg='發生錯誤，請稍後再試。';
