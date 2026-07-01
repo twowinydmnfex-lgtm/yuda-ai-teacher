@@ -275,9 +275,15 @@ function addMsg(role,html){
 }
 function showTyping(){
   const chat=document.getElementById('chat');
+  if(document.getElementById('typing'))return; // 避免重複
   const d=document.createElement('div');d.className='msg';d.id='typing';
-  d.innerHTML='<div class="msg-av">AI</div><div class="bub"><div class="typing-bub"><div class="td"></div><div class="td"></div><div class="td"></div></div></div>';
+  d.innerHTML='<div class="msg-av">AI</div><div class="bub"><div class="typing-bub"><div class="td"></div><div class="td"></div><div class="td"></div></div><div id="typing-label" style="font-size:11px;color:#94A3B8;margin-top:4px"></div></div>';
   chat.appendChild(d);chat.scrollTop=chat.scrollHeight;
+}
+function updateTyping(label){
+  const el=document.getElementById('typing-label');
+  if(el)el.textContent=label;
+  else{showTyping();setTimeout(()=>{const el2=document.getElementById('typing-label');if(el2)el2.textContent=label;},30);}
 }
 function removeTyping(){const t=document.getElementById('typing');if(t)t.remove();}
 
@@ -1031,12 +1037,15 @@ function buildPhaseFns(obj){
   if(gtype==='friction_disc'){
     let Ro=gp.Ro||30,Ri=gp.Ri||20,mu=gp.mu||0.2,T=gp.T||80,F=gp.F||160;
     let RavgRaw=gp.Ravg;
-    // ── 單位防呆：AI 有時會把 Ro/Ri 換算成公尺（如0.03）而不是毫米（30），
-    // 導致圓盤半徑算出來只有零點零幾像素、整個圖形消失。
-    // 偵測到數值明顯小於1（不可能是真實的毫米尺寸）就自動乘1000轉回mm。
-    if(Ro>0&&Ro<1) Ro=parseFloat((Ro*1000).toFixed(2));
-    if(Ri>0&&Ri<1) Ri=parseFloat((Ri*1000).toFixed(2));
-    if(RavgRaw!==undefined&&RavgRaw>0&&RavgRaw<1) RavgRaw=parseFloat((RavgRaw*1000).toFixed(2));
+    // ── 單位防呆：AI 傳入的是公分cm數值（如3、2、2.5）
+    // 若偵測到明顯是毫米（大於10），自動除以10轉為cm
+    // 若偵測到是公尺（小於0.5），自動乘100轉為cm
+    if(Ro>0&&Ro<0.5) Ro=parseFloat((Ro*100).toFixed(2));
+    if(Ro>10) Ro=parseFloat((Ro/10).toFixed(2));
+    if(Ri>0&&Ri<0.5) Ri=parseFloat((Ri*100).toFixed(2));
+    if(Ri>10) Ri=parseFloat((Ri/10).toFixed(2));
+    if(RavgRaw!==undefined&&RavgRaw>0&&RavgRaw<0.5) RavgRaw=parseFloat((RavgRaw*100).toFixed(2));
+    if(RavgRaw!==undefined&&RavgRaw>10) RavgRaw=parseFloat((RavgRaw/10).toFixed(2));
     // T 同理：如果明顯小於10，很可能已經被換算成 N-m，顯示時改標單位避免誤導
     const tUnit=(T>0&&T<10)?'N-m':'N-cm';
     const Ravg=RavgRaw||parseFloat(((Ro+Ri)/2).toFixed(1));
@@ -1058,9 +1067,9 @@ function buildPhaseFns(obj){
       ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+ro*ext,cy);ctx.stroke();
       ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx,cy-ri*ext);ctx.stroke();
       ctx.setLineDash([]);
-      LX(ctx,W,H,'Ro='+Ro+'mm',cx+ro/2,cy+18,'#64748B',13);
-      LX(ctx,W,H,'Ri='+Ri+'mm',cx+12,cy-ri/2-8,'#64748B',13);
-      tBox(ctx,W,H,['外徑 Ro='+Ro+'mm','內徑 Ri='+Ri+'mm','μ='+mu+'  T='+T+' '+tUnit],W*0.82,H*0.2,['#64748B','#64748B',blue],13);
+      LX(ctx,W,H,'Ro='+Ro+'cm',cx+ro/2,cy+18,'#64748B',13);
+      LX(ctx,W,H,'Ri='+Ri+'cm',cx+12,cy-ri/2-8,'#64748B',13);
+      tBox(ctx,W,H,['外徑 Ro='+Ro+'cm','內徑 Ri='+Ri+'cm','μ='+mu+'  T='+T+' '+tUnit],W*0.82,H*0.2,['#64748B','#64748B',blue],13);
     };
     const stepFns=phases.map((_,pi)=>(ctx,W,H,e)=>{
       ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
@@ -1088,12 +1097,12 @@ function buildPhaseFns(obj){
       ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+ro*(pi===0?e:1),cy);ctx.stroke();
       ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx,cy-ri*(pi===0?e:1));ctx.stroke();
       ctx.setLineDash([]);
-      LX(ctx,W,H,'Ro='+Ro+'mm',cx+ro/2,cy+18,'#64748B',13);
-      LX(ctx,W,H,'Ri='+Ri+'mm',cx+12,cy-ri/2-8,'#64748B',13);
+      LX(ctx,W,H,'Ro='+Ro+'cm',cx+ro/2,cy+18,'#64748B',13);
+      LX(ctx,W,H,'Ri='+Ri+'cm',cx+12,cy-ri/2-8,'#64748B',13);
 
       // ── phase 0 沒有 Ravg 和 F：顯示已知條件 ──
       if(pi===0&&!hasRavg&&!hasF){
-        tBox(ctx,W,H,['外徑 '+Ro+'mm → Ro='+Ro/10+'cm','內徑 '+Ri+'mm → Ri='+Ri/10+'cm','μ='+mu+'  T='+T+' '+tUnit],W*0.82,H*0.2,['#64748B','#64748B',blue],13);
+        tBox(ctx,W,H,['外徑Ro='+Ro+'cm（'+Ro*10+'mm÷10）','內徑Ri='+Ri+'cm（'+Ri*10+'mm÷10）','μ='+mu+'  T='+T+' '+tUnit],W*0.82,H*0.2,['#64748B','#64748B',blue],12);
       }
 
       // ── 有 Ravg：畫紅線 ──
@@ -1101,8 +1110,8 @@ function buildPhaseFns(obj){
         ctx.strokeStyle=red;ctx.lineWidth=2;
         ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+ravg*(pi===PN-2&&!isLast?e:1),cy-8);ctx.stroke();
         ctx.fillStyle=red;ctx.beginPath();ctx.arc(cx+ravg,cy-8,5,0,Math.PI*2);ctx.fill();
-        LX(ctx,W,H,'Ravg='+Ravg+'mm',cx+ravg+50,cy-24,red,13,true);
-        if(!hasF)tBox(ctx,W,H,['Ravg=(Ro+Ri)/2','=('+Ro+'+'+Ri+')/2','='+Ravg+' mm'],W*0.82,H*0.2,[red,red,red],13);
+        LX(ctx,W,H,'Ravg='+Ravg+'cm',cx+ravg+50,cy-24,red,13,true);
+        if(!hasF)tBox(ctx,W,H,['Ravg=(Ro+Ri)/2','=('+Ro+'+'+Ri+')/2','='+Ravg+' cm'],W*0.82,H*0.2,[red,red,red],13);
       }
 
       // ── 有 F（最後格）：推力箭頭 + 答案 ──
@@ -1112,7 +1121,7 @@ function buildPhaseFns(obj){
           ctx.strokeStyle=red;ctx.lineWidth=1.5;
           ctx.beginPath();ctx.moveTo(cx,cy);ctx.lineTo(cx+ravg,cy-8);ctx.stroke();
           ctx.fillStyle=red;ctx.beginPath();ctx.arc(cx+ravg,cy-8,5,0,Math.PI*2);ctx.fill();
-          LX(ctx,W,H,'Ravg='+Ravg+'mm',cx+ravg+50,cy-24,red,13,true);
+          LX(ctx,W,H,'Ravg='+Ravg+'cm',cx+ravg+50,cy-24,red,13,true);
         }
         const arx=Math.min(cx+ro+16,W-88);
         const alx=Math.max(cx-ro-16,50);
@@ -2184,7 +2193,33 @@ function addResultCard(q,phaseFns,exps,cardId,origQuery){
 }
 
 // ── System prompt ─────────────────────────────────────
-const SYS='你是育達補習班AI老師，只回傳純JSON不加任何說明、不使用markdown（禁止用**、*、`、#）：\n{"question":"題目20字","graphType":"類型","graphParams":{},"explanations":[{"title":"標題","body":"詳細說明文字，至少2句話"}],"phases":[{"title":"步名","formula":"算式或說明"}],"answer":"答案"}\n\n【graphType 完整選擇表】\n數學/機件：triangle；quadratic；sincos；pythagorean；rlc；vt；spring；gear；pulley；circle；circular_motion；vector；linear；linear_programming；dc_circuit；power；friction_disc。\n土木/機械力學→static_force。電機電子/資訊→logic_gate；transistor。商管會計→accounting。\n國文/閱讀測驗（含圖表判讀）→reading_chart。英文閱讀→english_reading；文法/克漏字→english_grammar；翻譯/作文→english_writing。\n化工/商管計算→calculation；非數學圖表判讀→chart_mcq；觀念/名詞解釋→concept_mcq；流程圖→process_flow。\n其他→text。\n\n【static_force 格式 - 靜力學/梁的反力/力矩】\ngraphParams:{beamLen:梁長公尺,loadType:"point或distributed",fy:力kN,dist:距A點距離公尺,reactionA:RA值,reactionB:RB值,angle:斜力角度(無斜力填0)}。\nphases 4個：phases[0]畫自由體圖標外力,phases[1]對A點取力矩求RB,phases[2]由ΣFy=0求RA,phases[3]驗算。explanations同4個。\n\n【logic_gate 格式 - 邏輯閘/真值表】\ngraphParams:{gate:"AND或OR或NOT或NAND或NOR或XOR或XNOR",inputs:["A","B"],expression:"布林表示式"}。\nphases 4個：phases[0]認識閘符號與邏輯運算,phases[1]列出真值表輸入組合,phases[2]逐行計算輸出,phases[3]確認答案。explanations同4個。\n\n【accounting 格式 - 借貸分錄/T字帳】\ngraphParams:{accounts:[{name:"帳戶名",debit:借方金額,credit:貸方金額}],equation:{assets:資產,liabilities:負債,equity:業主權益}}。accounts最多4個。\nphases 4個：phases[0]分析交易本質,phases[1]判斷借貸方向（資產增→借方；負債增→貸方），phases[2]填寫分錄,phases[3]過帳T字帳確認餘額。explanations同4個。\n\n【transistor 格式 - 電晶體特性曲線/工作點】\ngraphParams:{type:"BJT或FET",VCC:電源電壓,RC:集極電阻kΩ,IB:基極電流mA,hFE:電流增益,curves:[{ib:基極電流,ic:集極電流}]}。\nphases 4個：phases[0]認識特性曲線族,phases[1]畫直流負載線（兩端點：飽和點與截止點）,phases[2]找工作點Q（負載線與IB曲線交點）,phases[3]計算VCE與IC。explanations同4個。\n\n【reading_chart 格式 - 閱讀測驗/圖表判讀】\ngraphParams:{chartDesc:"圖表結構（座標軸/象限意義）"}。phases 4個：phases[0]讀懂圖表結構,phases[1]找出人物具體行為（引用原文），phases[2]行為對應座標位置,phases[3]逐一比對選項。禁止直接猜答案。\n\n【english_reading 格式】graphParams:{}。phases 4個：主題/關鍵字,題目定位,關鍵句解析,選項逐一分析。\n【english_grammar 格式】graphParams:{}。phases 4個：辨識題型,文法規則,代入驗證,確認+口訣。\n【english_writing 格式】graphParams:{}。phases 3個：句型分析,詞組示範,完整答案。\n【concept_mcq 格式】graphParams:{}。phases 4個：核心概念,定義說明,選項分析,答案+口訣。\n【chart_mcq 格式】graphParams:{chartDesc:"圖表說明"}。phases 4個：圖表結構,題目問什麼,對應位置,比對選項。\n【calculation 格式】graphParams:{}。phases 4個：已知整理,公式,代入計算,答案+單位。\n【process_flow 格式】graphParams:{steps:["步驟1",...]}，steps最多6個，phases數量=steps數量。\n\n【數學/機件格式（既有）】\ntriangle:{AB,AC,BC,angleA,angleB,angleC}。circle:{h,k,r,nh,nk,nr}。circular_motion:{R,mu,g}。linear_programming:phases剛好4個,phases[0]含不等式,phases[1]目標函數,phases[2]頂點列表,phases[3]最優解。friction_disc:{Ro,Ri,mu,T,Ravg,F}，Ro/Ri/Ravg單位mm，T單位N-cm。\n\nphases和explanations數量必須相等。計算題計算後驗算答案。\n\n【explanations 鐵律】每一個 explanation 的 body 必須包含完整說明，至少2句話，禁止只寫答案或「計算：(X)」。即使圖片不清晰，也必須根據已辨識的內容給出文法/概念/解題說明。若完全無法辨識題目內容，explanations[0].body 必須說明：「圖片辨識不完整，建議重拍後再試」，並說明正確的拍攝方式。';
+const SYS='你是育達補習班AI老師，只回傳純JSON不加任何說明、不使用markdown（禁止用**、*、`、#）：\n{"question":"題目20字","graphType":"類型","graphParams":{},"explanations":[{"title":"標題","body":"詳細說明文字，至少2句話"}],"phases":[{"title":"步名","formula":"算式或說明"}],"answer":"答案"}\n\n【graphType 完整選擇表】\n數學/機件：triangle；quadratic；sincos；pythagorean；rlc；vt；spring；gear；pulley；circle；circular_motion；vector；linear；linear_programming；dc_circuit；power；friction_disc。\n土木/機械力學→static_force。電機電子/資訊→logic_gate；transistor。商管會計→accounting。\n國文/閱讀測驗（含圖表判讀）→reading_chart。英文閱讀→english_reading；文法/克漏字→english_grammar；翻譯/作文→english_writing。\n化工/商管計算→calculation；非數學圖表判讀→chart_mcq；觀念/名詞解釋→concept_mcq；流程圖→process_flow。\n其他→text。\n\n【static_force 格式 - 靜力學/梁的反力/力矩】\ngraphParams:{beamLen:梁長公尺,loadType:"point或distributed",fy:力kN,dist:距A點距離公尺,reactionA:RA值,reactionB:RB值,angle:斜力角度(無斜力填0)}。\nphases 4個：phases[0]畫自由體圖標外力,phases[1]對A點取力矩求RB,phases[2]由ΣFy=0求RA,phases[3]驗算。explanations同4個。\n\n【logic_gate 格式 - 邏輯閘/真值表】\ngraphParams:{gate:"AND或OR或NOT或NAND或NOR或XOR或XNOR",inputs:["A","B"],expression:"布林表示式"}。\nphases 4個：phases[0]認識閘符號與邏輯運算,phases[1]列出真值表輸入組合,phases[2]逐行計算輸出,phases[3]確認答案。explanations同4個。\n\n【accounting 格式 - 借貸分錄/T字帳】\ngraphParams:{accounts:[{name:"帳戶名",debit:借方金額,credit:貸方金額}],equation:{assets:資產,liabilities:負債,equity:業主權益}}。accounts最多4個。\nphases 4個：phases[0]分析交易本質,phases[1]判斷借貸方向（資產增→借方；負債增→貸方），phases[2]填寫分錄,phases[3]過帳T字帳確認餘額。explanations同4個。\n\n【transistor 格式 - 電晶體特性曲線/工作點】\ngraphParams:{type:"BJT或FET",VCC:電源電壓,RC:集極電阻kΩ,IB:基極電流mA,hFE:電流增益,curves:[{ib:基極電流,ic:集極電流}]}。\nphases 4個：phases[0]認識特性曲線族,phases[1]畫直流負載線（兩端點：飽和點與截止點）,phases[2]找工作點Q（負載線與IB曲線交點）,phases[3]計算VCE與IC。explanations同4個。\n\n【reading_chart 格式 - 閱讀測驗/圖表判讀】\ngraphParams:{chartDesc:"圖表結構（座標軸/象限意義）"}。phases 4個：phases[0]讀懂圖表結構,phases[1]找出人物具體行為（引用原文），phases[2]行為對應座標位置,phases[3]逐一比對選項。禁止直接猜答案。\n\n【english_reading 格式】graphParams:{}。phases 4個：主題/關鍵字,題目定位,關鍵句解析,選項逐一分析。\n【english_grammar 格式】graphParams:{}。phases 4個：辨識題型,文法規則,代入驗證,確認+口訣。\n【english_writing 格式】graphParams:{}。phases 3個：句型分析,詞組示範,完整答案。\n【concept_mcq 格式】graphParams:{}。phases 4個：核心概念,定義說明,選項分析,答案+口訣。\n【chart_mcq 格式】graphParams:{chartDesc:"圖表說明"}。phases 4個：圖表結構,題目問什麼,對應位置,比對選項。\n【calculation 格式】graphParams:{}。phases 4個：已知整理,公式,代入計算,答案+單位。\n【process_flow 格式】graphParams:{steps:["步驟1",...]}，steps最多6個，phases數量=steps數量。\n\n【數學/機件格式（既有）】\ntriangle:{AB,AC,BC,angleA,angleB,angleC}。circle:{h,k,r,nh,nk,nr}。circular_motion:{R,mu,g}。linear_programming:phases剛好4個,phases[0]含不等式,phases[1]目標函數,phases[2]頂點列表,phases[3]最優解。friction_disc:{Ro,Ri,mu,T,Ravg,F}。【單位鐵律】題目給的是直徑→先除以2得半徑，再除以10統一換成公分cm；Ro/Ri/Ravg一律填公分cm數值；T一律填牛頓-公分N-cm數值；F維持牛頓N。公式F=T/(μ×Ravg)，分子分母單位必須一致（N-cm÷cm=N），禁止mm與cm混用。範例：外徑60mm→Ro=3cm，內徑40mm→Ri=2cm，Ravg=(3+2)/2=2.5cm，T=80N-cm，F=80/(0.2×2.5)=160N。\n\nphases和explanations數量必須相等。計算題計算後驗算答案。\n\n【explanations 鐵律】每一個 explanation 的 body 必須包含完整說明，至少2句話，禁止只寫答案或「計算：(X)」。即使圖片不清晰，也必須根據已辨識的內容給出文法/概念/解題說明。若完全無法辨識題目內容，explanations[0].body 必須說明：「圖片辨識不完整，建議重拍後再試」，並說明正確的拍攝方式。';
+
+// ── 第一階段：題型判斷 prompt ─────────────────────────
+const SYS_CLASSIFY='你是職業高中補習班的題型分析器。只回傳純JSON，不加任何說明：\n{"subject":"科目名稱","graphType":"類型","ambiguous":{"符號":"在此科目的意義與單位"},"hint":"給解題AI的關鍵提示（單位規定、公式選擇、注意事項）"}\n\n【科目對應graphType】\n機件原理→friction_disc/gear/pulley/spring；基本電學→rlc/dc_circuit/power/transistor；工程力學/靜力學→static_force；數學→triangle/quadratic/sincos/pythagorean/circle/vector/linear/linear_programming/circular_motion；國文→reading_chart；英文→english_reading/english_grammar/english_writing；商業概論/會計→accounting/concept_mcq；計算機概論→logic_gate/concept_mcq；其他→text。\n\n【高風險符號對照表 - 必須根據科目正確解讀】\nM：機件=力矩(N-cm)；電學=互感係數(H)\nT：機件=扭矩(N-cm)；電學=週期(s)；數學=常數\nR：機件=半徑(cm)；電學=電阻(Ω)；數學=比值\nf：機件=摩擦力(N)；電學=頻率(Hz)\nP：電學=功率(W)；商管=壓力/利潤率\nI：機件=轉動慣量；電學=電流(A)\nC：機件=彈簧常數；電學=電容(F)\nL：電學=電感(H)；靜力學=梁長(m)\nω：電學=角頻率(rad/s)；機件=角速度(rad/s)\n\n【hint 必填重點】\nfriction_disc：直徑→半徑→除10換cm，F=T/(μ×Ravg)，單位N-cm÷cm=N\nrlc/power：交流電路注意功率因數cosφ\nstatic_force：靜力平衡a=0，ΣF=0，ΣM=0\nlogic_gate：列完整真值表，輸出1為高態\naccounting：資產增→借方；負債增→貸方\n\n只判斷題型，不解題。';
+
+// ── 呼叫 Workers（共用）────────────────────────────────
+async function callWorkers(prompt, image){
+  const payload={studentId, prompt};
+  if(image) payload.image=image;
+  const res=await fetch(WORKERS_URL,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  });
+  return res;
+}
+
+// ── 解析 Workers 回傳的 Gemini 文字 ───────────────────
+function extractText(data){
+  if(data.candidates?.[0]?.content?.parts?.[0]?.text)
+    return data.candidates[0].content.parts[0].text;
+  if(data.candidates?.[0]?.content?.parts)
+    return data.candidates[0].content.parts.map(p=>p.text||'').join('');
+  if(typeof data.text==='string') return data.text;
+  if(typeof data.result==='string') return data.result;
+  return null;
+}
 
 // ── Send ──────────────────────────────────────────────
 async function send(){
@@ -2198,20 +2233,39 @@ async function send(){
     d.innerHTML='<div class="bub"><img src="data:image/jpeg;base64,'+pendingImg+'" style="max-width:160px;border-radius:6px;display:block;margin-bottom:4px">'+escapeHtml(q||'請解這道題')+'</div>';
     document.getElementById('chat').appendChild(d);document.getElementById('chat').scrollTop=99999;
   }else{addMsg('user',q);}
-  showTyping();
 
-  // 組合 prompt
-  let fullPrompt=SYS+'\n\n題目：'+q;
-  if(pendingImg) fullPrompt=SYS+'\n\n請仔細看圖片中的題目，完整解題。補充說明：'+(q||'請解這道題');
+  // ── 第一階段：題型判斷 ────────────────────────────
+  updateTyping('分析題目中…');showTyping();
+  let classifyResult={subject:'',graphType:'',ambiguous:{},hint:''};
+  try{
+    const classifyPrompt=SYS_CLASSIFY+'\n\n題目：'+(q||'請看圖片判斷題型');
+    const r1=await callWorkers(classifyPrompt, pendingImg);
+    if(r1.ok){
+      const d1=await r1.json();
+      const t1=extractText(d1);
+      if(t1){
+        let c=t1.replace(/^```json\s*/,'').replace(/\s*```$/,'').trim();
+        const fi=c.indexOf('{'),la=c.lastIndexOf('}');
+        if(fi!==-1&&la!==-1) c=c.slice(fi,la+1);
+        try{classifyResult=JSON.parse(c);}catch(e){}
+      }
+    }
+  }catch(e){}
+
+  // ── 第二階段：帶著判斷結果解題 ───────────────────
+  updateTyping('解題中…');
+  const subjectCtx=classifyResult.subject?'【科目】'+classifyResult.subject+'\n':'';
+  const graphCtx=classifyResult.graphType?'【題型】請使用 graphType: "'+classifyResult.graphType+'"\n':'';
+  const ambigCtx=Object.keys(classifyResult.ambiguous||{}).length
+    ?'【符號說明】'+JSON.stringify(classifyResult.ambiguous)+'\n':'';
+  const hintCtx=classifyResult.hint?'【解題注意】'+classifyResult.hint+'\n':'';
+  const contextBlock=subjectCtx+graphCtx+ambigCtx+hintCtx;
+
+  let fullPrompt=SYS+'\n\n'+contextBlock+'題目：'+q;
+  if(pendingImg) fullPrompt=SYS+'\n\n'+contextBlock+'請仔細看圖片中的題目，完整解題。補充說明：'+(q||'請解這道題');
 
   try{
-    const payload={studentId:studentId, prompt:fullPrompt};
-    if(pendingImg) payload.image=pendingImg;
-    const res=await fetch(WORKERS_URL,{
-      method:'POST',
-      headers:{'Content-Type':'application/json'},
-      body:JSON.stringify(payload)
-    });
+    const res=await callWorkers(fullPrompt, pendingImg);
     if(!res.ok){
       removeTyping();
       let statusMsg='';
@@ -2241,14 +2295,9 @@ async function send(){
     }
     // Workers 使用 Gemini API，格式為 data.candidates[0].content.parts[0].text
     let raw='{}';
-    if(data.candidates?.[0]?.content?.parts?.[0]?.text){
-      raw=data.candidates[0].content.parts[0].text;
-    } else if(data.candidates?.[0]?.content?.parts){
-      raw=data.candidates[0].content.parts.map(p=>p.text||'').join('');
-    } else if(typeof data.text==='string'){
-      raw=data.text;
-    } else if(typeof data.result==='string'){
-      raw=data.result;
+    const rawText=extractText(data);
+    if(rawText){
+      raw=rawText;
     } else {
       const dataPreview=JSON.stringify(data).slice(0,400);
       removeTyping();
