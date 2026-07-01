@@ -2038,7 +2038,16 @@ function buildPhaseFns(obj){
     });
   }
 
-return phases.map((_,pi)=>(ctx,W,H,e)=>{
+return genericStepFns(phases,ans);
+}
+
+// ── 通用文字步驟圖（無需 graphParams，只靠 phases/answer）──────
+// 用途：(1) buildPhaseFns 遇到未知 graphType 時的預設畫面
+//      (2) 外層 buildPhaseFns(obj) 整包拋例外時的緊急備援，盡量還是給圖而不是純空白
+function genericStepFns(phases,ans){
+  phases=(Array.isArray(phases)&&phases.length)?phases:[{title:'解題過程',formula:ans||''}];
+  const PN=phases.length;
+  return phases.map((_,pi)=>(ctx,W,H,e)=>{
     ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
     const step=phases[pi]||{};
     const colors=['#0C447C','#854F0B','#085041','#3C3489','#A32D2D','#1D9E75'];
@@ -2429,21 +2438,31 @@ async function send(){
     }
     // ── 圖形與解說解耦：圖形產生失敗不能連累解說卡片 ──
     // buildPhaseFns 內部若因 graphParams 異常等原因拋出例外，
-    // 改用最小佔位圖形頂上，確保右側「老師說明」一定能正常顯示。
+    // 優先改用通用步驟圖（只靠 phases/answer，不吃 graphParams，盡量還是給圖），
+    // 萬一連通用圖也失敗，最後才退回純文字佔位，確保右側「老師說明」一定能正常顯示。
     let phaseFns;
     try{
       phaseFns=buildPhaseFns(obj);
       if(!Array.isArray(phaseFns)||phaseFns.length===0) throw new Error('empty phaseFns');
     }catch(gErr){
-      console.warn('⚠️ 圖形產生失敗，改用佔位圖形，解說不受影響：',gErr);
-      phaseFns=[(ctx,W,H)=>{
-        ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
-        ctx.fillStyle='#94A3B8';ctx.font='500 14px \'Noto Sans TC\',system-ui,sans-serif';
-        ctx.textAlign='center';ctx.textBaseline='middle';
-        ctx.fillText('圖形暫時無法顯示，請參考右側說明',W/2,H/2-10);
-        ctx.font='400 12px \'Noto Sans TC\',system-ui,sans-serif';
-        ctx.fillText('解題步驟與答案不受影響',W/2,H/2+16);
-      }];
+      console.warn('⚠️ 圖形產生失敗，改用通用步驟圖，解說不受影響：',gErr);
+      try{
+        const fallbackPhases=(Array.isArray(obj.phases)&&obj.phases.length)
+          ?obj.phases
+          :explanationsArr.map(ex=>({title:ex.title,formula:ex.body}));
+        phaseFns=genericStepFns(fallbackPhases,obj.answer||'');
+        if(!Array.isArray(phaseFns)||phaseFns.length===0) throw new Error('empty generic phaseFns');
+      }catch(gErr2){
+        console.warn('⚠️ 通用步驟圖也失敗，改用純文字佔位：',gErr2);
+        phaseFns=[(ctx,W,H)=>{
+          ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,W,H);
+          ctx.fillStyle='#94A3B8';ctx.font='500 14px \'Noto Sans TC\',system-ui,sans-serif';
+          ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText('圖形暫時無法顯示，請參考右側說明',W/2,H/2-10);
+          ctx.font='400 12px \'Noto Sans TC\',system-ui,sans-serif';
+          ctx.fillText('解題步驟與答案不受影響',W/2,H/2+16);
+        }];
+      }
     }
     addResultCard(obj.question||dispQ,phaseFns,explanationsArr,cardId,dispQ);
   }catch(err){
