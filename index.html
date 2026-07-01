@@ -296,8 +296,26 @@ function animCard(id){
   function frame(){
     t=Math.min(t+1/45,1);
     const fns=cardPhasesList[id];const p=cardPhases[id]||0;
-    if(fns&&fns[p]){const cv=document.getElementById('cv_'+id);if(cv){const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);fns[p](ctx,cv.width,cv.height,ease(t));}}
-    syncUI(id);if(t<1)cardAnimIds[id]=requestAnimationFrame(frame);
+    if(fns&&fns[p]){
+      const cv=document.getElementById('cv_'+id);
+      if(cv){
+        const ctx=cv.getContext('2d');
+        ctx.clearRect(0,0,cv.width,cv.height);
+        try{
+          fns[p](ctx,cv.width,cv.height,ease(t));
+        }catch(err){
+          // 繪圖出錯時不讓畫布卡死在空白：畫底色＋提示，並讓動畫迴圈繼續跑
+          console.error('[圖形繪製錯誤] card='+id+' phase='+p, err);
+          ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,cv.width,cv.height);
+          ctx.fillStyle='#94A3B8';ctx.font='13px system-ui,-apple-system,sans-serif';
+          ctx.textAlign='center';ctx.textBaseline='middle';
+          ctx.fillText('圖形繪製發生錯誤，已略過此步驟',cv.width/2,cv.height/2);
+        }
+      }
+    }
+    syncUI(id);
+    // 就算這一幀出錯，動畫迴圈也要繼續往下跑，不能永久卡死
+    if(t<1)cardAnimIds[id]=requestAnimationFrame(frame);
   }
   requestAnimationFrame(frame);
 }
@@ -734,27 +752,36 @@ function buildPhaseFns(obj){
 
   // ── 圓的方程式 circle ────────────────────────────────
   if(gtype==='circle'){
-    // graphParams：h,k,r = 原始圓；nh,nk,nr = 新圓（若無則只畫一個圓）
-    const h=gp.h!==undefined?+gp.h:0;
-    const k=gp.k!==undefined?+gp.k:0;
-    const r=gp.r!==undefined?+gp.r:5;
-    const hasNew=gp.nh!==undefined||gp.nk!==undefined||gp.nr!==undefined;
-    const nh=gp.nh!==undefined?+gp.nh:h;
-    const nk=gp.nk!==undefined?+gp.nk:k;
-    const nr=gp.nr!==undefined?+gp.nr:r/2;
+    // 數值防呆：NaN/Infinity/非數字一律回退成安全預設值，避免整張圖崩掉
+    const safeNum=(v,fallback)=>{const n=+v;return Number.isFinite(n)?n:fallback;};
 
-    // 從 phases formula 嘗試解析新圓圓心與半徑
+    // graphParams：h,k,r = 原始圓；nh,nk,nr = 新圓（若無則只畫一個圓）
+    const h=safeNum(gp.h,0);
+    const k=safeNum(gp.k,0);
+    const r=Math.max(0.5,safeNum(gp.r,5));
+    const hasNew=gp.nh!==undefined||gp.nk!==undefined||gp.nr!==undefined;
+    const nh=safeNum(gp.nh,h);
+    const nk=safeNum(gp.nk,k);
+    const nr=Math.max(0.5,safeNum(gp.nr,r/2));
+
+    // 從 phases formula 嘗試解析新圓圓心與半徑（僅在確實有「新圓」題型時才覆蓋，避免單一圓題目被誤判）
     let ph=nh,pk=nk,pr=nr;
-    phases.forEach(p=>{
-      const f=(p.formula||'');
-      // 抓 (x-a)²+(y-b)²=r² 形式
-      const m=f.match(/\(x([+-]\d+\.?\d*)?\).*\(y([+-]\d+\.?\d*)?\).*=\s*(\d+\.?\d*)/);
-      if(m){
-        ph=m[1]?-parseFloat(m[1]):0;
-        pk=m[2]?-parseFloat(m[2]):0;
-        pr=Math.sqrt(parseFloat(m[3]));
-      }
-    });
+    if(hasNew){
+      phases.forEach(p=>{
+        const f=(p.formula||'');
+        // 抓 (x-a)²+(y-b)²=r² 形式
+        const m=f.match(/\(x([+-]\d+\.?\d*)?\).*\(y([+-]\d+\.?\d*)?\).*=\s*(\d+\.?\d*)/);
+        if(m){
+          const parsedH=m[1]?-parseFloat(m[1]):0;
+          const parsedK=m[2]?-parseFloat(m[2]):0;
+          const r2=parseFloat(m[3]);
+          // r² 必須是非負數才能開根號，否則保留原本的安全預設值
+          if(Number.isFinite(parsedH)&&Number.isFinite(parsedK)&&Number.isFinite(r2)&&r2>=0){
+            ph=parsedH;pk=parsedK;pr=Math.max(0.5,Math.sqrt(r2));
+          }
+        }
+      });
+    }
 
     // 圓方程式字串輔助
     function circleEq(ch,ck,cr){
@@ -768,9 +795,11 @@ function buildPhaseFns(obj){
 
       // 計算合理縮放：包含原圓和新圓
       const allH=[h,ph],allK=[k,pk],allR=[r,pr];
-      const maxExt=Math.max(...allH.map((hh,i)=>Math.abs(hh)+allR[i]*1.2),
+      const maxExtRaw=Math.max(...allH.map((hh,i)=>Math.abs(hh)+allR[i]*1.2),
                             ...allK.map((kk,i)=>Math.abs(kk)+allR[i]*1.2), 3);
-      const sc=Math.min((W-80)/(maxExt*2),(H-60)/(maxExt*2),30);
+      const maxExt=Number.isFinite(maxExtRaw)&&maxExtRaw>0?maxExtRaw:3;
+      const scRaw=Math.min((W-80)/(maxExt*2),(H-60)/(maxExt*2),30);
+      const sc=Number.isFinite(scRaw)&&scRaw>0?scRaw:10;
       const cx=W/2,cy=H/2;
 
       // 網格
@@ -2207,7 +2236,7 @@ function addResultCard(q,phaseFns,exps,cardId,origQuery){
     +'</div>'
     +'</div>';
   chat.appendChild(wrap);chat.scrollTop=chat.scrollHeight;
-  setTimeout(()=>{const cv=document.getElementById('cv_'+cardId);if(cv&&phaseFns[0]){const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);phaseFns[0](ctx,cv.width,cv.height,1);}syncUI(cardId);},60);
+  setTimeout(()=>{const cv=document.getElementById('cv_'+cardId);if(cv&&phaseFns[0]){const ctx=cv.getContext('2d');ctx.clearRect(0,0,cv.width,cv.height);try{phaseFns[0](ctx,cv.width,cv.height,1);}catch(err){console.error('[圖形繪製錯誤] 初次繪製',err);ctx.fillStyle='#F0F5FB';ctx.fillRect(0,0,cv.width,cv.height);ctx.fillStyle='#94A3B8';ctx.font='13px system-ui,-apple-system,sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('圖形繪製發生錯誤，已略過此步驟',cv.width/2,cv.height/2);}}syncUI(cardId);},60);
 }
 
 // ── System prompt ─────────────────────────────────────
